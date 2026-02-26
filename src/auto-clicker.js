@@ -36,13 +36,13 @@
   let syncTimeout = null; // Debouncing synchronizacji
 
   const debugMode = true; // Ustaw na false, aby wyłączyć logi debugowania
-  
+
   // Eksponuj globalny stan dla komunikacji z panelem
   window.AutoClickerState = {
     slotsCount: 0,
     slots: [],
     isRunning: false,
-    timestamp: 0
+    timestamp: 0,
   };
   const REFRESH_MIN_INTERVAL_MS = 850;
   const REFRESH_RATE_LIMIT_CHECK_MS = 500;
@@ -628,7 +628,7 @@
         isToast = false;
         toastObserver = false;
         toastObservertimer = false;
-        
+
         // Synchronizuj ze panelem
         syncWithPanel();
         return true;
@@ -698,7 +698,7 @@
       intervalRunning = true;
       isStartingRefresh = true;
       clickAlternating();
-      
+
       // Synchronizuj ze panelem
       syncWithPanel();
 
@@ -1168,21 +1168,21 @@
   function syncWithPanel() {
     // Aktualizuj globalny stan dla komunikacji z panelem
     const currentCount = preferredHoursTest ? preferredHoursTest.length : 0;
-    
+
     // Jeśli liczba slotów się zmieniła, zaktualizuj stan
     if (currentCount !== lastSyncSlotsCount || intervalRunning !== null) {
       lastSyncSlotsCount = currentCount;
-      
+
       // Zaktualizuj globalny stan
       window.AutoClickerState = {
         slotsCount: currentCount,
         slots: preferredHoursTest || [],
         isRunning: intervalRunning !== null,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
-      
+
       if (debugMode) {
-        console.log('[AutoClicker] State synced:', window.AutoClickerState);
+        console.log("[AutoClicker] State synced:", window.AutoClickerState);
       }
     }
   }
@@ -1389,20 +1389,24 @@
   window.AutoClicker = {
     init: () => {
       const avSlots = document.querySelector("#av-slots");
-      
+
       if (!avSlots) {
         // Panel rezerwacji nie istnieje - czekaj na jego pojawienie się
-        console.log("AutoClicker: Panel rezerwacji nie znaleziony, czekam na jego pojawienie...");
-        
+        console.log(
+          "AutoClicker: Panel rezerwacji nie znaleziony, czekam na jego pojawienie...",
+        );
+
         // Utwórz obserwer który będzie czekać na pojawienie się panelu
         let panelObserver = null;
         let observerTimeout = null;
-        
+
         const watchForPanel = () => {
           panelObserver = new MutationObserver((mutations) => {
             if (document.querySelector("#av-slots")) {
-              console.log("✓ AutoClicker: Panel rezerwacji wykryty! Inicjalizuję...");
-              
+              console.log(
+                "✓ AutoClicker: Panel rezerwacji wykryty! Inicjalizuję...",
+              );
+
               // Wyczyść obserwer
               if (panelObserver) {
                 panelObserver.disconnect();
@@ -1411,39 +1415,44 @@
               if (observerTimeout) {
                 clearTimeout(observerTimeout);
               }
-              
+
               // Reinicjalizuj z panelem
               window.AutoClicker._initializeWithPanel();
             }
           });
-          
+
           panelObserver.observe(document.body, {
             childList: true,
             subtree: true,
           });
-          
+
           // Timeout - jeśli panel się nie pojawi w ciągu 5 minut, zrezygnuj
-          observerTimeout = setTimeout(() => {
-            if (panelObserver) {
-              panelObserver.disconnect();
-              panelObserver = null;
-              console.log("AutoClicker: Timeout - panel rezerwacji nie pojawił się w ciągu 5 minut");
-            }
-          }, 5 * 60 * 1000);
+          observerTimeout = setTimeout(
+            () => {
+              if (panelObserver) {
+                panelObserver.disconnect();
+                panelObserver = null;
+                console.log(
+                  "AutoClicker: Timeout - panel rezerwacji nie pojawił się w ciągu 5 minut",
+                );
+              }
+            },
+            5 * 60 * 1000,
+          );
         };
-        
+
         // Dodaj sygnał dla UI że czekamy
         window.AutoClicker.waitingForPanel = true;
         window.AutoClicker._watchForPanel = watchForPanel;
         watchForPanel();
-        
+
         return false; // Zwróć false - jeszcze się nie zainicjalizował
       }
-      
+
       // Panel istnieje - inicjalizuj od razu
       return window.AutoClicker._initializeWithPanel();
     },
-    
+
     _initializeWithPanel: () => {
       // Rzeczywista inicjalizacja gdy panel istnieje
       injectStyles();

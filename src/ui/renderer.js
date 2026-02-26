@@ -32,39 +32,52 @@ function monitorSlotsState() {
   const browser = getActiveBrowser();
   if (!browser || !browser.webview) return;
 
-  browser.webview.executeJavaScript(
-    'JSON.stringify(window.AutoClickerState || { slotsCount: 0, slots: [], isRunning: false })'
-  )
-  .then((stateJson) => {
-    try {
-      const state = JSON.parse(stateJson);
-      
-      // Jeśli liczba slotów się zmieniła, wyświetl powiadomienie
-      if (state.slotsCount !== lastMonitoredSlotsCount) {
-        lastMonitoredSlotsCount = state.slotsCount;
-        
-        if (state.slotsCount > 0) {
-          if (state.slotsCount === 1) {
-            addLog(`✓ Wybrany 1 slot do klikania (${browser.id.toUpperCase()})`, "info", browser.id);
-          } else {
-            addLog(`✓ Wybranych ${state.slotsCount} slotów do klikania (${browser.id.toUpperCase()})`, "info", browser.id);
+  browser.webview
+    .executeJavaScript(
+      "JSON.stringify(window.AutoClickerState || { slotsCount: 0, slots: [], isRunning: false })",
+    )
+    .then((stateJson) => {
+      try {
+        const state = JSON.parse(stateJson);
+
+        // Jeśli liczba slotów się zmieniła, wyświetl powiadomienie
+        if (state.slotsCount !== lastMonitoredSlotsCount) {
+          lastMonitoredSlotsCount = state.slotsCount;
+
+          if (state.slotsCount > 0) {
+            if (state.slotsCount === 1) {
+              addLog(
+                `✓ Wybrany 1 slot do klikania (${browser.id.toUpperCase()})`,
+                "info",
+                browser.id,
+              );
+            } else {
+              addLog(
+                `✓ Wybranych ${state.slotsCount} slotów do klikania (${browser.id.toUpperCase()})`,
+                "info",
+                browser.id,
+              );
+            }
+          } else if (state.slotsCount === 0 && lastMonitoredSlotsCount > 0) {
+            addLog(
+              `✓ Wyczyszczono sloty (${browser.id.toUpperCase()})`,
+              "info",
+              browser.id,
+            );
           }
-        } else if (state.slotsCount === 0 && lastMonitoredSlotsCount > 0) {
-          addLog(`✓ Wyczyszczono sloty (${browser.id.toUpperCase()})`, "info", browser.id);
         }
+
+        // Aktualizuj status light jeśli się coś zmienia
+        if (state.isRunning) {
+          updateStatusLight(browser);
+        }
+      } catch (error) {
+        // Błąd parsowania - webview może nie mieć jeszcze window.AutoClickerState
       }
-      
-      // Aktualizuj status light jeśli się coś zmienia
-      if (state.isRunning) {
-        updateStatusLight(browser);
-      }
-    } catch (error) {
-      // Błąd parsowania - webview może nie mieć jeszcze window.AutoClickerState
-    }
-  })
-  .catch((error) => {
-    // Błąd executeJavaScript - ignoruj
-  });
+    })
+    .catch((error) => {
+      // Błąd executeJavaScript - ignoruj
+    });
 }
 
 function startSlotsMonitoring() {
@@ -237,7 +250,7 @@ Object.values(browsers).forEach((browser) => {
     browser.urlInput.value = e.url;
     browser.scenario.metadata.url = e.url;
     addLog(`Załadowano: ${e.url}`, "success", browser.id);
-    
+
     // Reset monitoring slotów na nowej stronie
     lastMonitoredSlotsCount = -1;
   });
@@ -460,7 +473,7 @@ let autoClickerScript = null;
 function updateAutoClickerButton() {
   if (!toggleAutoClickerBtn) return;
   const browser = getActiveBrowser();
-  
+
   if (browser.autoClickerEnabled) {
     if (browser.waitingForPanel) {
       toggleAutoClickerBtn.innerText = "⏳ Czekam na panel rezerwacji";
@@ -563,39 +576,40 @@ function waitForPanelReady(browser) {
   // Monitoruj czy panel się pojawił
   let checkCount = 0;
   const maxChecks = 300; // 5 minut (300 x 1000ms)
-  
+
   const checkPanel = setInterval(() => {
     checkCount++;
-    
-    browser.webview.executeJavaScript(
-      'window.AutoClicker ? window.AutoClicker.waitingForPanel : null'
-    )
-    .then((waiting) => {
-      if (waiting === false) {
-        // Panel się pojawił i zainicjalizował! 
-        clearInterval(checkPanel);
-        addLog(
-          "✅ Panel rezerwacji znaleziony i AutoClicker zainicjalizowany",
-          "success",
-          browser.id,
-        );
-        // UI już powinien być OK bo AutoClicker.init zwrócił true
-        updateStatusLight(browser);
-      } else if (checkCount >= maxChecks) {
-        // Timeout - panel się nie pojawił
-        clearInterval(checkPanel);
-        browser.autoClickerEnabled = false;
-        updateAutoClickerButton();
-        addLog(
-          "⏱️ Timeout: Panel rezerwacji nie pojawił się w ciągu 5 minut",
-          "warning",
-          browser.id,
-        );
-      }
-    })
-    .catch(() => {
-      // Błąd - zignoruj i próbuj dalej
-    });
+
+    browser.webview
+      .executeJavaScript(
+        "window.AutoClicker ? window.AutoClicker.waitingForPanel : null",
+      )
+      .then((waiting) => {
+        if (waiting === false) {
+          // Panel się pojawił i zainicjalizował!
+          clearInterval(checkPanel);
+          addLog(
+            "✅ Panel rezerwacji znaleziony i AutoClicker zainicjalizowany",
+            "success",
+            browser.id,
+          );
+          // UI już powinien być OK bo AutoClicker.init zwrócił true
+          updateStatusLight(browser);
+        } else if (checkCount >= maxChecks) {
+          // Timeout - panel się nie pojawił
+          clearInterval(checkPanel);
+          browser.autoClickerEnabled = false;
+          updateAutoClickerButton();
+          addLog(
+            "⏱️ Timeout: Panel rezerwacji nie pojawił się w ciągu 5 minut",
+            "warning",
+            browser.id,
+          );
+        }
+      })
+      .catch(() => {
+        // Błąd - zignoruj i próbuj dalej
+      });
   }, 1000);
 }
 
@@ -628,13 +642,13 @@ toggleAutoClickerBtn.addEventListener("click", async () => {
   const isInjected = await injectAutoClicker(browser);
   if (isInjected) {
     initAutoClicker(browser);
-    
+
     // Czekaj aby sprawdzić wynik inicjalizacji
     setTimeout(async () => {
       const initResult = await browser.webview.executeJavaScript(`
         window.AutoClicker ? window.AutoClicker.waitingForPanel : null
       `);
-      
+
       if (initResult === true) {
         // Czekamy na panel rezerwacji
         browser.autoClickerEnabled = true;
@@ -659,11 +673,7 @@ toggleAutoClickerBtn.addEventListener("click", async () => {
         browser.autoClickerEnabled = false;
         browser.waitingForPanel = false;
         updateAutoClickerButton();
-        addLog(
-          "✗ Błąd inicjalizacji AutoClickera",
-          "error",
-          browser.id,
-        );
+        addLog("✗ Błąd inicjalizacji AutoClickera", "error", browser.id);
       }
     }, 100);
   } else {
