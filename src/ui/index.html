@@ -1,0 +1,658 @@
+<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Web Test Automation</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: #1a1a1a;
+        color: #e0e0e0;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      /* ===== HEADER ===== */
+      .header {
+        background: #2d2d2d;
+        padding: 10px 20px;
+        border-bottom: 2px solid #444;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .header h1 {
+        font-size: 20px;
+        color: #667eea;
+      }
+
+      .license-info {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        font-size: 12px;
+        color: #aaa;
+      }
+
+      .license-badge {
+        padding: 5px 12px;
+        background: #4caf50;
+        color: white;
+        border-radius: 12px;
+        font-weight: bold;
+        font-size: 11px;
+      }
+
+      /* ===== MAIN CONTAINER ===== */
+      .main-container {
+        display: flex;
+        height: calc(100vh - 60px);
+      }
+
+      /* ===== SIDEBAR ===== */
+      .sidebar {
+        width: 350px;
+        background: #242424;
+        border-right: 2px solid #444;
+        overflow-y: auto;
+        padding: 20px;
+      }
+
+      .sidebar h2 {
+        font-size: 16px;
+        color: #667eea;
+        margin-bottom: 15px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+
+      .control-section {
+        background: #2d2d2d;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 15px;
+      }
+
+      .control-section h3 {
+        font-size: 14px;
+        color: #aaa;
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      /* ===== BUTTONS ===== */
+      .btn {
+        width: 100%;
+        padding: 10px 15px;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+      }
+
+      .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+      }
+
+      .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+      }
+
+      .btn-success {
+        background: #4caf50;
+        color: white;
+      }
+
+      .btn-danger {
+        background: #f44336;
+        color: white;
+      }
+
+      .btn-secondary {
+        background: #555;
+        color: white;
+      }
+
+      .btn-small {
+        padding: 6px 10px;
+        font-size: 12px;
+        margin-bottom: 0;
+      }
+
+      .btn.active {
+        background: #667eea;
+        box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.4);
+      }
+
+      .btn.waiting {
+        background: #f59e0b;
+        box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.4);
+        animation: pulse-warning 1.5s ease-in-out infinite;
+      }
+
+      @keyframes pulse-warning {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.7; }
+      }
+
+      .btn:disabled {
+        background: #444;
+        cursor: not-allowed;
+        opacity: 0.5;
+      }
+
+      /* ===== TOGGLE SWITCH ===== */
+      .toggle-group {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px;
+        background: #1a1a1a;
+        border-radius: 6px;
+        margin-bottom: 10px;
+      }
+
+      .url-status {
+        font-size: 12px;
+        color: #cfcfcf;
+        padding: 4px 8px;
+        background: #1a1a1a;
+        border: 1px solid #444;
+        border-radius: 12px;
+      }
+
+      .status-light {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: #f44336;
+        box-shadow: 0 0 4px rgba(244, 67, 54, 0.6);
+        transition: all 0.3s ease;
+      }
+
+      .status-light--yellow {
+        background: #ffc107;
+        box-shadow: 0 0 4px rgba(255, 193, 7, 0.8);
+      }
+
+      .status-light--green {
+        background: #4caf50;
+        box-shadow: 0 0 4px rgba(76, 175, 80, 0.8);
+        animation: pulse-light 1s ease-in-out infinite;
+      }
+
+      @keyframes pulse-light {
+        0%,
+        100% {
+          box-shadow: 0 0 4px rgba(76, 175, 80, 0.8);
+        }
+        50% {
+          box-shadow: 0 0 8px rgba(76, 175, 80, 1);
+        }
+      }
+
+      .toggle-label {
+        font-size: 13px;
+        color: #ddd;
+      }
+
+      .switch {
+        position: relative;
+        width: 50px;
+        height: 24px;
+      }
+
+      .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+
+      .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #555;
+        transition: 0.4s;
+        border-radius: 24px;
+      }
+
+      .slider:before {
+        position: absolute;
+        content: "";
+        height: 18px;
+        width: 18px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        transition: 0.4s;
+        border-radius: 50%;
+      }
+
+      input:checked + .slider {
+        background-color: #4caf50;
+      }
+
+      input:checked + .slider:before {
+        transform: translateX(26px);
+      }
+
+      /* ===== SCRIPT EDITOR ===== */
+      .script-editor {
+        margin-top: 10px;
+      }
+
+      textarea {
+        width: 100%;
+        min-height: 120px;
+        background: #1a1a1a;
+        color: #e0e0e0;
+        border: 1px solid #444;
+        border-radius: 6px;
+        padding: 10px;
+        font-family: "Courier New", monospace;
+        font-size: 12px;
+        resize: vertical;
+      }
+
+      textarea:focus {
+        outline: none;
+        border-color: #667eea;
+      }
+
+      /* ===== LOGS ===== */
+      .logs-section {
+        background: #1a1a1a;
+        border-radius: 6px;
+        padding: 10px;
+        max-height: 200px;
+        overflow-y: auto;
+        font-family: "Courier New", monospace;
+        font-size: 11px;
+      }
+
+      .log-entry {
+        padding: 5px;
+        margin: 2px 0;
+        border-radius: 3px;
+      }
+
+      .log-success {
+        color: #4caf50;
+      }
+
+      .log-error {
+        color: #f44336;
+      }
+
+      .log-info {
+        color: #2196f3;
+      }
+
+      /* ===== WEBVIEW CONTAINER ===== */
+      .webview-container {
+        flex: 1;
+        background: #1a1a1a;
+        display: flex;
+        flex-direction: row;
+      }
+
+      .webview-container.single-mode .webview-pane {
+        flex: 1;
+      }
+
+      .webview-pane {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        border-left: 1px solid #333;
+      }
+
+      .webview-pane:first-child {
+        border-left: none;
+      }
+
+      .webview-pane.active-pane {
+        box-shadow: inset 0 0 0 2px rgba(102, 126, 234, 0.8);
+      }
+
+      .webview-pane.is-hidden {
+        display: none;
+      }
+
+      .url-bar {
+        background: #2d2d2d;
+        padding: 10px 15px;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        border-bottom: 1px solid #444;
+      }
+
+      .url-input {
+        flex: 1;
+        padding: 8px 15px;
+        background: #1a1a1a;
+        border: 1px solid #444;
+        border-radius: 20px;
+        color: #e0e0e0;
+        font-size: 14px;
+      }
+
+      .url-input:focus {
+        outline: none;
+        border-color: #667eea;
+      }
+
+      .url-btn {
+        color: white;
+        border: none;
+        border-radius: 20px;
+        cursor: pointer;
+        font-weight: 600;
+        color: #fff;
+      }
+
+      .url-btn:hover {
+        color: #5568d3;
+      }
+      .url-btn.refresh-btn,
+      .url-btn.open-www,
+      .url-btn.open-cart {
+        padding: 0px;
+        background: transparent;
+      }
+
+      webview {
+        flex: 1;
+        width: 100%;
+        height: 100%;
+        background: white;
+      }
+
+      .browser-selector {
+        display: flex;
+        gap: 8px;
+      }
+
+      /* ===== SCROLLBAR ===== */
+      ::-webkit-scrollbar {
+        width: 8px;
+      }
+
+      ::-webkit-scrollbar-track {
+        background: #1a1a1a;
+      }
+
+      ::-webkit-scrollbar-thumb {
+        background: #555;
+        border-radius: 4px;
+      }
+
+      ::-webkit-scrollbar-thumb:hover {
+        background: #777;
+      }
+
+      .status-indicator {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #4caf50;
+        animation: pulse 2s infinite;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.5;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- HEADER -->
+    <div class="header">
+      <h1>🚀 Web Test Automation</h1>
+      <div class="license-info">
+        <div class="status-indicator"></div>
+        <span>Licencja: <span id="license-key">Ładowanie...</span></span>
+        <span class="license-badge">AKTYWNA</span>
+      </div>
+    </div>
+
+    <!-- MAIN CONTAINER -->
+    <div class="main-container">
+      <!-- SIDEBAR -->
+      <div class="sidebar">
+        <h2>⚙️ Panel Kontrolny</h2>
+
+        <!-- Aktywna przeglądarka -->
+        <div class="control-section">
+          <h3>🧭 Aktywna Przeglądarka</h3>
+          <div class="browser-selector">
+            <button class="btn btn-secondary btn-small" id="browser-a-btn">
+              Przeglądarka A
+            </button>
+            <button class="btn btn-secondary btn-small" id="browser-b-btn">
+              Przeglądarka B
+            </button>
+          </div>
+          <p style="font-size: 11px; color: #888; margin-top: 8px">
+            Akcje z panelu dotyczą aktywnej przeglądarki.
+          </p>
+        </div>
+
+        <!-- isTrusted Override -->
+        <div class="control-section">
+          <h3>🔓 Kontrola isTrusted</h3>
+          <div class="toggle-group">
+            <span class="toggle-label">Override isTrusted</span>
+            <label class="switch">
+              <input type="checkbox" id="toggle-istrusted" />
+              <span class="slider"></span>
+            </label>
+          </div>
+          <p style="font-size: 11px; color: #888; margin-top: 5px">
+            Gdy włączone, wszystkie zdarzenia będą zgłaszać isTrusted = true
+          </p>
+        </div>
+
+        <!-- Auto Clicker -->
+        <div class="control-section">
+          <h3>🤖 Auto Clicker</h3>
+          <button class="btn btn-success" id="toggle-auto-clicker-btn">
+            ▶️ Włącz Auto Clicker
+          </button>
+          <p style="font-size: 11px; color: #888; margin-top: 5px">
+            Automatyczne klikanie w dostępne sloty na stronie
+          </p>
+        </div>
+
+        <!-- DevTools -->
+        <div class="control-section">
+          <h3>🛠️ Narzędzia</h3>
+          <button class="btn btn-secondary" id="devtools-btn">
+            🔧 Otwórz DevTools
+          </button>
+        </div>
+
+        <!-- Logi -->
+        <div class="control-section">
+          <h3>📊 Logi</h3>
+          <div class="logs-section" id="logs"></div>
+        </div>
+      </div>
+
+      <!-- WEBVIEW CONTAINER -->
+      <div class="webview-container single-mode" id="webview-container">
+        <div class="webview-pane" id="pane-a">
+          <div class="url-bar">
+            <input
+              type="text"
+              class="url-input"
+              id="url-input-a"
+              placeholder="Wpisz adres URL (np. https://ebrama.baltichub.com)"
+              value="https://ebrama.baltichub.com"
+            />
+            <button class="url-btn open-www" id="go-btn-a" title="Otwórz URL">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                x="0px"
+                y="0px"
+                width="30"
+                height="30"
+                viewBox="0 0 64 64"
+                fill="currentColor"
+              >
+                <path
+                  d="M 40 10 C 38.896 10 38 10.896 38 12 C 38 13.104 38.896 14 40 14 L 47.171875 14 L 30.585938 30.585938 C 29.804938 31.366938 29.804938 32.633063 30.585938 33.414062 C 30.976938 33.805063 31.488 34 32 34 C 32.512 34 33.023063 33.805062 33.414062 33.414062 L 50 16.828125 L 50 24 C 50 25.104 50.896 26 52 26 C 53.104 26 54 25.104 54 24 L 54 12 C 54 10.896 53.104 10 52 10 L 40 10 z M 18 12 C 14.691 12 12 14.691 12 18 L 12 46 C 12 49.309 14.691 52 18 52 L 46 52 C 49.309 52 52 49.309 52 46 L 52 34 C 52 32.896 51.104 32 50 32 C 48.896 32 48 32.896 48 34 L 48 46 C 48 47.103 47.103 48 46 48 L 18 48 C 16.897 48 16 47.103 16 46 L 16 18 C 16 16.897 16.897 16 18 16 L 30 16 C 31.104 16 32 15.104 32 14 C 32 12.896 31.104 12 30 12 L 18 12 z"
+                ></path>
+              </svg>
+            </button>
+            <button
+              class="url-btn refresh-btn"
+              id="refresh-btn-a"
+              title="Odśwież stronę"
+            >
+              <svg
+                fill="currentColor"
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 30 30"
+                width="25px"
+                height="25px"
+              >
+                <path
+                  d="M 15 3 C 12.031398 3 9.3028202 4.0834384 7.2070312 5.875 A 1.0001 1.0001 0 1 0 8.5058594 7.3945312 C 10.25407 5.9000929 12.516602 5 15 5 C 20.19656 5 24.450989 8.9379267 24.951172 14 L 22 14 L 26 20 L 30 14 L 26.949219 14 C 26.437925 7.8516588 21.277839 3 15 3 z M 4 10 L 0 16 L 3.0507812 16 C 3.562075 22.148341 8.7221607 27 15 27 C 17.968602 27 20.69718 25.916562 22.792969 24.125 A 1.0001 1.0001 0 1 0 21.494141 22.605469 C 19.74593 24.099907 17.483398 25 15 25 C 9.80344 25 5.5490109 21.062074 5.0488281 16 L 8 16 L 4 10 z"
+                />
+              </svg>
+            </button>
+            <button
+              class="url-btn open-cart"
+              id="open-browser-b-btn"
+              title="Otwórz nową kartę"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                style="width: 30px; height: 30px"
+              >
+                <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+              </svg>
+            </button>
+            <div
+              class="status-light"
+              id="status-light-a"
+              title="AutoClicker: wyłączony"
+            ></div>
+          </div>
+          <webview
+            id="webview-a"
+            src="https://ebrama.baltichub.com"
+            partition="persist:browser-a"
+          ></webview>
+        </div>
+
+        <div class="webview-pane is-hidden" id="pane-b">
+          <div class="url-bar">
+            <input
+              type="text"
+              class="url-input"
+              id="url-input-b"
+              placeholder="Wpisz adres URL (np. https://ebrama.baltichub.com)"
+              value="https://www.google.com"
+            />
+            <button class="url-btn open-www" id="go-btn-b" title="Otwórz URL">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                x="0px"
+                y="0px"
+                width="30"
+                height="30"
+                viewBox="0 0 64 64"
+                fill="currentColor"
+              >
+                <path
+                  d="M 40 10 C 38.896 10 38 10.896 38 12 C 38 13.104 38.896 14 40 14 L 47.171875 14 L 30.585938 30.585938 C 29.804938 31.366938 29.804938 32.633063 30.585938 33.414062 C 30.976938 33.805063 31.488 34 32 34 C 32.512 34 33.023063 33.805062 33.414062 33.414062 L 50 16.828125 L 50 24 C 50 25.104 50.896 26 52 26 C 53.104 26 54 25.104 54 24 L 54 12 C 54 10.896 53.104 10 52 10 L 40 10 z M 18 12 C 14.691 12 12 14.691 12 18 L 12 46 C 12 49.309 14.691 52 18 52 L 46 52 C 49.309 52 52 49.309 52 46 L 52 34 C 52 32.896 51.104 32 50 32 C 48.896 32 48 32.896 48 34 L 48 46 C 48 47.103 47.103 48 46 48 L 18 48 C 16.897 48 16 47.103 16 46 L 16 18 C 16 16.897 16.897 16 18 16 L 30 16 C 31.104 16 32 15.104 32 14 C 32 12.896 31.104 12 30 12 L 18 12 z"
+                ></path>
+              </svg>
+            </button>
+            <button
+              class="url-btn refresh-btn"
+              id="refresh-btn-b"
+              title="Odśwież stronę"
+            >
+              <svg
+                fill="currentColor"
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 30 30"
+                width="25px"
+                height="25px"
+              >
+                <path
+                  d="M 15 3 C 12.031398 3 9.3028202 4.0834384 7.2070312 5.875 A 1.0001 1.0001 0 1 0 8.5058594 7.3945312 C 10.25407 5.9000929 12.516602 5 15 5 C 20.19656 5 24.450989 8.9379267 24.951172 14 L 22 14 L 26 20 L 30 14 L 26.949219 14 C 26.437925 7.8516588 21.277839 3 15 3 z M 4 10 L 0 16 L 3.0507812 16 C 3.562075 22.148341 8.7221607 27 15 27 C 17.968602 27 20.69718 25.916562 22.792969 24.125 A 1.0001 1.0001 0 1 0 21.494141 22.605469 C 19.74593 24.099907 17.483398 25 15 25 C 9.80344 25 5.5490109 21.062074 5.0488281 16 L 8 16 L 4 10 z"
+                />
+              </svg>
+            </button>
+            <button
+              class="url-btn open-cart"
+              id="close-browser-b-btn"
+              title="Zamknij kartę"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                style="width: 30px; height: 30px"
+              >
+                <path
+                  d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
+                />
+              </svg>
+            </button>
+            <div
+              class="status-light"
+              id="status-light-b"
+              title="AutoClicker: wyłączony"
+            ></div>
+          </div>
+          <webview
+            id="webview-b"
+            src="about:blank"
+            partition="persist:browser-b"
+          ></webview>
+        </div>
+      </div>
+    </div>
+
+    <script src="../auto-clicker.js"></script>
+    <script src="renderer.js"></script>
+  </body>
+</html>

@@ -1,0 +1,45 @@
+{
+  "name": "web-test-automation-app",
+  "version": "1.0.0",
+  "description": "Aplikacja do testowania stron z AutoClicker i kontrolą zdarzeń",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win"
+  },
+  "keywords": [
+    "automation",
+    "testing",
+    "webview",
+    "electron",
+    "autoclicker"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1"
+  },
+  "dependencies": {
+    "node-machine-id": "^1.1.12"
+  },
+  "build": {
+    "appId": "com.company.web-test-automation",
+    "productName": "WebTestAutomation",
+    "win": {
+      "target": ["nsis"],
+      "icon": "assets/icon.ico"
+    },
+    "files": [
+      "src/**/*",
+      "chrome-extension/**/*",
+      "package.json"
+    ],
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

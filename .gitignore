@@ -1,0 +1,25 @@
+node_modules/
+dist/
+build/
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+
+# Electron
+out/
+*.exe
+*.dmg
+*.app
+
+# Licencje (nie commituj)
+license.dat
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# System
+desktop.ini

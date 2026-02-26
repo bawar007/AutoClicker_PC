@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aktywacja Licencji</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      color: #333;
+    }
+
+    .license-container {
+      background: white;
+      padding: 40px;
+      border-radius: 15px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+      width: 100%;
+      max-width: 450px;
+    }
+
+    h1 {
+      text-align: center;
+      color: #667eea;
+      margin-bottom: 10px;
+      font-size: 28px;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: #666;
+      margin-bottom: 30px;
+      font-size: 14px;
+    }
+
+    .form-group {
+      margin-bottom: 25px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      color: #555;
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 12px 15px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 16px;
+      transition: border-color 0.3s;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      font-family: 'Courier New', monospace;
+    }
+
+    input[type="text"]:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
+    input[type="text"]::placeholder {
+      text-transform: none;
+      letter-spacing: normal;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    .machine-id {
+      background: #f5f5f5;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+
+    .machine-id-label {
+      font-size: 12px;
+      color: #888;
+      margin-bottom: 5px;
+    }
+
+    .machine-id-value {
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      color: #333;
+      word-break: break-all;
+      font-weight: bold;
+    }
+
+    button {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .error-message {
+      color: #e74c3c;
+      text-align: center;
+      margin-top: 15px;
+      font-size: 14px;
+      display: none;
+      padding: 10px;
+      background: #fee;
+      border-radius: 5px;
+    }
+
+    .info-box {
+      background: #e3f2fd;
+      padding: 15px;
+      border-radius: 8px;
+      margin-top: 20px;
+      border-left: 4px solid #2196F3;
+    }
+
+    .info-box p {
+      font-size: 13px;
+      color: #1976D2;
+      line-height: 1.6;
+    }
+
+    .format-help {
+      font-size: 12px;
+      color: #999;
+      margin-top: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div class="license-container">
+    <h1>🔐 Aktywacja Licencji</h1>
+    <p class="subtitle">Web Test Automation App</p>
+
+    <div class="machine-id">
+      <div class="machine-id-label">ID Komputera:</div>
+      <div class="machine-id-value" id="machine-id">Ładowanie...</div>
+    </div>
+
+    <form id="license-form">
+      <div class="form-group">
+        <label for="license-key">Klucz Licencyjny</label>
+        <input 
+          type="text" 
+          id="license-key" 
+          placeholder="XXXX-XXXX-XXXX-XXXX"
+          maxlength="19"
+          required
+        >
+        <div class="format-help">Format: XXXX-XXXX-XXXX-XXXX</div>
+      </div>
+
+      <button type="submit" id="activate-btn">Aktywuj Licencję</button>
+    </form>
+
+    <div class="error-message" id="error-message"></div>
+
+    <div class="info-box">
+      <p>
+        💡 <strong>Wskazówka:</strong> Klucz licencyjny jest przypisany do tego komputera. 
+        Zapisz swój ID komputera w bezpiecznym miejscu.
+      </p>
+    </div>
+  </div>
+
+  <script>
+    // Formatowanie klucza podczas wpisywania
+    const licenseInput = document.getElementById('license-key');
+    licenseInput.addEventListener('input', (e) => {
+      let value = e.target.value.replace(/[^A-Z0-9]/gi, '').toUpperCase();
+      let formatted = '';
+      
+      for (let i = 0; i < value.length && i < 16; i++) {
+        if (i > 0 && i % 4 === 0) {
+          formatted += '-';
+        }
+        formatted += value[i];
+      }
+      
+      e.target.value = formatted;
+    });
+
+    // Pobranie Machine ID
+    window.electronAPI.getMachineId().then(result => {
+      document.getElementById('machine-id').textContent = result.machineId || 'Niedostępne';
+    });
+
+    // Obsługa formularza
+    document.getElementById('license-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const licenseKey = licenseInput.value.trim();
+      const errorDiv = document.getElementById('error-message');
+      const activateBtn = document.getElementById('activate-btn');
+      
+      errorDiv.style.display = 'none';
+      activateBtn.disabled = true;
+      activateBtn.textContent = 'Aktywacja...';
+      
+      // Walidacja formatu
+      const regex = /^[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/;
+      if (!regex.test(licenseKey)) {
+        errorDiv.textContent = 'Nieprawidłowy format klucza licencyjnego';
+        errorDiv.style.display = 'block';
+        activateBtn.disabled = false;
+        activateBtn.textContent = 'Aktywuj Licencję';
+        return;
+      }
+      
+      // Wysłanie do aktywacji
+      window.electronAPI.activateLicense(licenseKey);
+    });
+
+    // Obsługa błędów aktywacji
+    window.electronAPI.onLicenseError((error) => {
+      const errorDiv = document.getElementById('error-message');
+      const activateBtn = document.getElementById('activate-btn');
+      
+      errorDiv.textContent = error;
+      errorDiv.style.display = 'block';
+      activateBtn.disabled = false;
+      activateBtn.textContent = 'Aktywuj Licencję';
+    });
+  </script>
+</body>
+</html>
