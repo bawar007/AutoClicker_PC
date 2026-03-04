@@ -1,0 +1,696 @@
+<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Zarządzanie Licencją</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: #1a1a1a;
+        color: #e0e0e0;
+        padding: 20px;
+      }
+
+      .container {
+        max-width: 600px;
+        margin: 0 auto;
+      }
+
+      h1 {
+        color: #667eea;
+        margin-bottom: 30px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 24px;
+      }
+
+      .license-card {
+        background: #2d2d2d;
+        border: 2px solid #444;
+        border-radius: 12px;
+        padding: 25px;
+        margin-bottom: 20px;
+      }
+
+      .license-card.active {
+        border-color: #4caf50;
+        box-shadow: 0 0 15px rgba(76, 175, 80, 0.3);
+      }
+
+      .license-card.inactive {
+        border-color: #f44336;
+        box-shadow: 0 0 15px rgba(244, 67, 54, 0.3);
+      }
+
+      .info-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        margin-bottom: 20px;
+      }
+
+      .info-item {
+        background: #1a1a1a;
+        padding: 15px;
+        border-radius: 8px;
+        border-left: 4px solid #667eea;
+      }
+
+      .info-label {
+        font-size: 12px;
+        color: #888;
+        text-transform: uppercase;
+        margin-bottom: 5px;
+        letter-spacing: 1px;
+      }
+
+      .info-value {
+        font-size: 16px;
+        color: #e0e0e0;
+        font-weight: bold;
+        word-break: break-all;
+      }
+
+      .license-type {
+        display: inline-block;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 14px;
+        font-weight: bold;
+        margin-bottom: 15px;
+      }
+
+      .license-type.basic {
+        background: #2196f3;
+        color: white;
+      }
+
+      .license-type.gold {
+        background: #ffc107;
+        color: #333;
+      }
+
+      .license-type.inactive {
+        background: #757575;
+        color: white;
+      }
+
+      .status-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 20px;
+      }
+
+      .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-weight: bold;
+        font-size: 13px;
+      }
+
+      .status-badge.active {
+        background: #4caf50;
+        color: white;
+      }
+
+      .status-badge.inactive {
+        background: #f44336;
+        color: white;
+      }
+
+      .status-indicator {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: currentColor;
+        animation: pulse 2s ease-in-out infinite;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.5;
+        }
+      }
+
+      .section {
+        margin-top: 30px;
+      }
+
+      .section-title {
+        font-size: 14px;
+        color: #667eea;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 15px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .browser-slots {
+        background: #2d2d2d;
+        border: 1px solid #444;
+        border-radius: 8px;
+        padding: 20px;
+      }
+
+      .slot-info {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 15px;
+      }
+
+      .slot-bar {
+        flex: 1;
+        height: 8px;
+        background: #1a1a1a;
+        border-radius: 4px;
+        overflow: hidden;
+        margin: 0 15px;
+      }
+
+      .slot-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #667eea, #764ba2);
+        border-radius: 4px;
+        transition: width 0.3s ease;
+      }
+
+      .slot-text {
+        font-size: 13px;
+        color: #aaa;
+      }
+
+      .action-buttons {
+        display: flex;
+        gap: 10px;
+        margin-top: 20px;
+      }
+
+      .btn {
+        flex: 1;
+        padding: 12px 20px;
+        border: none;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: all 0.3s;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+
+      .btn-primary {
+        background: #667eea;
+        color: white;
+      }
+
+      .btn-primary:hover {
+        background: #764ba2;
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+      }
+
+      .btn-danger {
+        background: #f44336;
+        color: white;
+      }
+
+      .btn-danger:hover {
+        background: #da190b;
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(244, 67, 54, 0.4);
+      }
+
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .no-license {
+        text-align: center;
+        padding: 40px 20px;
+        color: #888;
+      }
+
+      .no-license-icon {
+        font-size: 48px;
+        margin-bottom: 15px;
+      }
+
+      .expiry-warning {
+        background: #f44336;
+        color: white;
+        padding: 12px;
+        border-radius: 8px;
+        margin-bottom: 15px;
+        font-size: 13px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .expiry-warning.warning {
+        background: #ff9800;
+      }
+
+      .expiry-warning.info {
+        background: #2196f3;
+      }
+
+      .loading {
+        text-align: center;
+        padding: 40px;
+        color: #888;
+      }
+
+      .spinner {
+        display: inline-block;
+        width: 30px;
+        height: 30px;
+        border: 3px solid #444;
+        border-top: 3px solid #667eea;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      .info-full-width {
+        grid-column: 1 / -1;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>🔐 Zarządzanie Licencją</h1>
+
+      <div id="loading" class="loading" style="display: none">
+        <div class="spinner"></div>
+        <p style="margin-top: 15px">Ładowanie informacji...</p>
+      </div>
+
+      <div id="no-license" style="display: none">
+        <div class="license-card inactive">
+          <div class="no-license">
+            <div class="no-license-icon">❌</div>
+            <h2 style="margin-bottom: 10px">Brak aktywnej licencji</h2>
+            <p style="margin-bottom: 20px; font-size: 13px">
+              Aplikacja wymaga aktywnej licencji do działania.
+            </p>
+            <button
+              class="btn btn-primary"
+              onclick="window.api.openActivationWindow()"
+            >
+              Aktywuj Licencję
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div id="license-panel" style="display: none">
+        <!-- Ekspiracja ostrzeżenie -->
+        <div id="expiry-warning" style="display: none"></div>
+
+        <!-- Główna karta licencji -->
+        <div class="license-card active">
+          <div
+            style="
+              display: flex;
+              justify-content: space-between;
+              align-items: start;
+              margin-bottom: 15px;
+            "
+          >
+            <div>
+              <div class="license-type basic" id="license-type-badge">
+                BASIC
+              </div>
+              <div class="status-row">
+                <div class="status-badge active" id="status-badge">
+                  <span class="status-indicator"></span>
+                  <span>AKTYWNA</span>
+                </div>
+              </div>
+            </div>
+            <div style="text-align: right; font-size: 12px; color: #888">
+              <button
+                class="btn"
+                style="
+                  padding: 6px 12px;
+                  font-size: 11px;
+                  margin-top: 5px;
+                  width: auto;
+                  background: #444;
+                  color: #e0e0e0;
+                "
+                onclick="window.api.refreshLicense()"
+              >
+                🔄 Odśwież
+              </button>
+            </div>
+          </div>
+
+          <div class="info-grid">
+            <div class="info-item">
+              <div class="info-label">🔑 Typ licencji</div>
+              <div class="info-value" id="license-type">BASIC</div>
+            </div>
+
+            <div class="info-item">
+              <div class="info-label">👥 Max przeglądarek</div>
+              <div class="info-value" id="max-browsers">2</div>
+            </div>
+
+            <div class="info-item">
+              <div class="info-label">📅 Aktywowana</div>
+              <div class="info-value" id="activated-date">—</div>
+            </div>
+
+            <div class="info-item">
+              <div class="info-label">⏰ Wygasa</div>
+              <div class="info-value" id="expires-date">—</div>
+            </div>
+
+            <div class="info-item info-full-width">
+              <div class="info-label">🖥️ Machine ID</div>
+              <div class="info-value" id="machine-id" style="font-size: 12px">
+                —
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sekcja przeglądarek -->
+        <div class="section">
+          <div class="section-title">📊 Status Przeglądarek</div>
+          <div class="browser-slots">
+            <div class="slot-info">
+              <span style="font-size: 13px; font-weight: bold"
+                >Zajęte sloty</span
+              >
+              <span class="slot-text"
+                ><span id="current-browsers">0</span> /
+                <span id="max-browsers-slot">2</span></span
+              >
+            </div>
+            <div class="slot-bar">
+              <div class="slot-fill" id="slot-fill" style="width: 0%"></div>
+            </div>
+            <div
+              style="
+                font-size: 12px;
+                color: #888;
+                margin-left: 15px;
+                min-width: 80px;
+                text-align: right;
+              "
+            >
+              <span id="available-slots">2</span> wolnych
+            </div>
+          </div>
+        </div>
+
+        <!-- Akcje -->
+        <div class="section">
+          <div class="action-buttons">
+            <button
+              class="btn btn-primary"
+              onclick="window.api.openActivationWindow()"
+            >
+              🔄 Zmień Licencję
+            </button>
+            <button class="btn btn-danger" onclick="window.api.revokeLicense()">
+              🗑️ Usuń Licencję
+            </button>
+          </div>
+        </div>
+
+        <!-- Informacje techniczne -->
+        <div class="section">
+          <div class="section-title">ℹ️ Informacje Techniczne</div>
+          <div class="browser-slots">
+            <div style="font-size: 12px; color: #aaa">
+              <p style="margin-bottom: 10px">
+                <strong>API Serwera:</strong> http://localhost:5000<br />
+                <strong>Status:</strong>
+                <span id="api-status">Sprawdzanie...</span>
+              </p>
+              <p style="margin-top: 10px; font-size: 11px; color: #666">
+                Licencja jest przechowywana lokalnie na tym komputerze i
+                zaszyfrowana za pomocą Machine ID.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      console.log("[License Manager] ========== START ==========");
+      console.log("[License Manager] Plik license-manager.html załadowany");
+
+      // Komunikacja z parent window przez postMessage
+      window.api = {
+        getLicenseInfo: () => {
+          return new Promise((resolve) => {
+            const handler = (event) => {
+              if (event.data.type === "license-info-response") {
+                window.removeEventListener("message", handler);
+                resolve(event.data.data);
+              }
+            };
+            window.addEventListener("message", handler);
+            window.parent.postMessage({ type: "get-license-info" }, "*");
+          });
+        },
+        refreshLicense: () => {
+          loadLicenseInfo();
+        },
+        openActivationWindow: () => {
+          window.parent.postMessage({ type: "open-license-activation" }, "*");
+        },
+        revokeLicense: () => {
+          if (confirm("Czy na pewno chcesz usunąć licencję?")) {
+            return new Promise((resolve) => {
+              const handler = (event) => {
+                if (event.data.type === "revoke-license-response") {
+                  window.removeEventListener("message", handler);
+                  // Zamiast przeładowywać, po prostu odśwież dane
+                  setTimeout(() => {
+                    loadLicenseInfo();
+                    resolve();
+                  }, 500);
+                }
+              };
+              window.addEventListener("message", handler);
+              window.parent.postMessage({ type: "revoke-license" }, "*");
+            });
+          }
+        },
+      };
+
+      console.log("[License Manager] Skrypt załadowany (iframe)");
+      console.log(
+        "[License Manager] Używam postMessage API do komunikacji z parent window",
+      );
+
+      // Nasłuchuj na wiadomości z parent window (np. refresh)
+      window.addEventListener("message", (event) => {
+        if (event.data && event.data.type === "refresh-license") {
+          console.log(
+            "[License Manager] Otrzymano żądanie odświeżenia licencji",
+          );
+          loadLicenseInfo();
+        }
+      });
+
+      // Załaduj informacje o licencji
+      async function loadLicenseInfo() {
+        try {
+          console.log("[License Manager] Ładuję informacje o licencji...");
+
+          document.getElementById("loading").style.display = "block";
+
+          console.log(
+            "[License Manager] Wywołuję getLicenseInfo poprzez postMessage...",
+          );
+          const info = await window.api.getLicenseInfo();
+          console.log("[License Manager] Odpowiedź getLicenseInfo:", info);
+
+          document.getElementById("loading").style.display = "none";
+
+          if (!info.isActive) {
+            document.getElementById("no-license").style.display = "block";
+            return;
+          }
+
+          // Wyświetl panel licencji
+          document.getElementById("license-panel").style.display = "block";
+
+          // Typ licencji
+          const licenseType = info.licenseType || "UNKNOWN";
+          document.getElementById("license-type").textContent = licenseType;
+          document.getElementById("license-type-badge").textContent =
+            licenseType;
+          document.getElementById("license-type-badge").className =
+            `license-type ${licenseType.toLowerCase()}`;
+
+          // Max przeglądarek
+          document.getElementById("max-browsers").textContent =
+            info.maxBrowsers || "—";
+          document.getElementById("max-browsers-slot").textContent =
+            info.maxBrowsers || "—";
+
+          // Aktywowana
+          if (info.activatedAt) {
+            const activatedDate = new Date(info.activatedAt);
+            document.getElementById("activated-date").textContent =
+              activatedDate.toLocaleDateString("pl-PL", {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              });
+          }
+
+          // Wygasa
+          if (info.expiresAt) {
+            const expiresDate = new Date(info.expiresAt);
+            const today = new Date();
+            const daysLeft = Math.ceil(
+              (expiresDate - today) / (1000 * 60 * 60 * 24),
+            );
+
+            document.getElementById("expires-date").textContent =
+              expiresDate.toLocaleDateString("pl-PL", {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              });
+
+            // Pokaż ostrzeżenie jeśli licencja wygasa niedługo
+            if (daysLeft < 0) {
+              showExpiryWarning(
+                "WYGASŁA",
+                `Ta licencja wygasła ${Math.abs(daysLeft)} dni temu.`,
+                "error",
+              );
+              document.getElementById("status-badge").className =
+                "status-badge inactive";
+              document.getElementById("status-badge").innerHTML =
+                '<span class="status-indicator"></span><span>WYGASŁA</span>';
+            } else if (daysLeft < 30) {
+              showExpiryWarning(
+                "OSTRZEŻENIE",
+                `Licencja wygaśnie za ${daysLeft} dni.`,
+                "warning",
+              );
+            } else if (daysLeft < 90) {
+              showExpiryWarning(
+                "INFO",
+                `Licencja ważna przez ${daysLeft} dni.`,
+                "info",
+              );
+            }
+          }
+
+          // Machine ID
+          document.getElementById("machine-id").textContent =
+            info.machineId || "—";
+
+          // Status przeglądarek
+          document.getElementById("current-browsers").textContent =
+            info.currentBrowsers || 0;
+          document.getElementById("available-slots").textContent =
+            (info.maxBrowsers || 0) - (info.currentBrowsers || 0);
+
+          const percentage =
+            info.maxBrowsers > 0
+              ? ((info.currentBrowsers || 0) / info.maxBrowsers) * 100
+              : 0;
+          document.getElementById("slot-fill").style.width = percentage + "%";
+
+          // API Status
+          checkAPIStatus();
+        } catch (error) {
+          console.error("Błąd ładowania licencji:", error);
+          document.getElementById("loading").style.display = "none";
+          document.getElementById("no-license").style.display = "block";
+        }
+      }
+
+      function showExpiryWarning(title, message, type) {
+        const warningDiv = document.getElementById("expiry-warning");
+        warningDiv.innerHTML = `⚠️ ${title}: ${message}`;
+        warningDiv.className = `expiry-warning ${type}`;
+        warningDiv.style.display = "flex";
+      }
+
+      async function checkAPIStatus() {
+        try {
+          const response = await fetch("http://localhost:5000/health");
+          if (response.ok) {
+            document.getElementById("api-status").textContent = "✅ Dostępny";
+          }
+        } catch {
+          document.getElementById("api-status").textContent = "❌ Niedostępny";
+        }
+      }
+
+      // Załaduj gdy wszystko będzie gotowe
+      function initLicense() {
+        console.log("[License Manager] Inicjalizacja licencji");
+        console.log(
+          "[License Manager] window.electronAPI dostępny?",
+          !!window.electronAPI,
+        );
+
+        if (document.readyState === "loading") {
+          document.addEventListener("DOMContentLoaded", () => {
+            console.log("[License Manager] DOM gotów, ładuję licencję");
+            loadLicenseInfo();
+          });
+        } else {
+          console.log("[License Manager] DOM już załadowany, ładuję licencję");
+          loadLicenseInfo();
+        }
+      }
+
+      // Czekaj chwilę aby dać preload czas na załadowanie
+      if (window.electronAPI) {
+        console.log(
+          "[License Manager] electronAPI już dostępny, inituję zaraz",
+        );
+        initLicense();
+      } else {
+        console.log("[License Manager] Czekam 500ms na electronAPI...");
+        setTimeout(initLicense, 500);
+      }
+    </script>
+  </body>
+</html>

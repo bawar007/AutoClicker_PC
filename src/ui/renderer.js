@@ -3,25 +3,44 @@
 
 const paneA = document.getElementById("pane-a");
 const paneB = document.getElementById("pane-b");
+const paneC = document.getElementById("pane-c");
+const paneD = document.getElementById("pane-d");
 const webviewContainer = document.getElementById("webview-container");
 const browserButtonA = document.getElementById("browser-a-btn");
 const browserButtonB = document.getElementById("browser-b-btn");
+const browserButtonC = document.getElementById("browser-c-btn");
+const browserButtonD = document.getElementById("browser-d-btn");
 const openBrowserBButton = document.getElementById("open-browser-b-btn");
 const closeBrowserBButton = document.getElementById("close-browser-b-btn");
+const closeBrowserCButton = document.getElementById("close-browser-c-btn");
+const closeBrowserDButton = document.getElementById("close-browser-d-btn");
 const webviewA = document.getElementById("webview-a");
 const webviewB = document.getElementById("webview-b");
+const webviewC = document.getElementById("webview-c");
+const webviewD = document.getElementById("webview-d");
 const urlInputA = document.getElementById("url-input-a");
 const urlInputB = document.getElementById("url-input-b");
+const urlInputC = document.getElementById("url-input-c");
+const urlInputD = document.getElementById("url-input-d");
 const goBtnA = document.getElementById("go-btn-a");
 const goBtnB = document.getElementById("go-btn-b");
+const goBtnC = document.getElementById("go-btn-c");
+const goBtnD = document.getElementById("go-btn-d");
 const refreshBtnA = document.getElementById("refresh-btn-a");
 const refreshBtnB = document.getElementById("refresh-btn-b");
+const refreshBtnC = document.getElementById("refresh-btn-c");
+const refreshBtnD = document.getElementById("refresh-btn-d");
 const toggleIsTrusted = document.getElementById("toggle-istrusted");
 const devtoolsBtn = document.getElementById("devtools-btn");
 const logsContainer = document.getElementById("logs");
 const toggleAutoClickerBtn = document.getElementById("toggle-auto-clicker-btn");
 const statusLightA = document.getElementById("status-light-a");
 const statusLightB = document.getElementById("status-light-b");
+const statusLightC = document.getElementById("status-light-c");
+const statusLightD = document.getElementById("status-light-d");
+
+// License Manager Button - zaladować dynamicznie
+let licenseManagerBtn = null;
 
 // ==================== SYNCHRONIZACJA Z WEBVIEW ====================
 // Monitorowanie stanu slotów i synchronizacji z panelem kontrolnym
@@ -141,22 +160,71 @@ const browsers = {
     waitingForPanel: false,
     scenario: createScenario(),
   },
+  c: {
+    id: "c",
+    label: "C",
+    pane: paneC,
+    webview: webviewC,
+    urlInput: urlInputC,
+    goBtn: goBtnC,
+    refreshBtn: refreshBtnC,
+    isTrustedEnabled: false,
+    autoClickerEnabled: false,
+    waitingForPanel: false,
+    scenario: createScenario(),
+  },
+  d: {
+    id: "d",
+    label: "D",
+    pane: paneD,
+    webview: webviewD,
+    urlInput: urlInputD,
+    goBtn: goBtnD,
+    refreshBtn: refreshBtnD,
+    isTrustedEnabled: false,
+    autoClickerEnabled: false,
+    waitingForPanel: false,
+    scenario: createScenario(),
+  },
 };
 
 const browserButtons = {
   a: browserButtonA,
   b: browserButtonB,
+  c: browserButtonC,
+  d: browserButtonD,
 };
 
 let activeBrowserId = "a";
 let isBrowserBOpen = false;
+let isBrowserCOpen = false;
+let isBrowserDOpen = false;
+let maxBrowsers = 2; // Domyślnie BASIC (2 przeglądarki)
 
 // ==================== INICJALIZACJA ====================
 
-// Załaduj informacje o licencji
+// Załaduj informacje o licencji i skonfiguruj przeglądarki
 window.electronAPI.getLicenseInfo().then((info) => {
-  if (info.valid) {
-    document.getElementById("license-key").textContent = info.key;
+  if (info.isActive) {
+    document.getElementById("license-key").textContent = info.licenseKey || "—";
+
+    // Ustaw max przeglądarek na podstawie typu licencji
+    maxBrowsers = info.maxBrowsers || 2;
+    console.log(
+      `[License] Typ licencji: ${info.licenseType}, Max przeglądarek: ${maxBrowsers}`,
+    );
+
+    // Pokaż przyciski C i D dla licencji GOLD (4 przeglądarki)
+    if (maxBrowsers >= 4) {
+      browserButtonC.style.display = "inline-block";
+      browserButtonD.style.display = "inline-block";
+      addLog("✅ Licencja GOLD - dostępne 4 przeglądarki", "success");
+    } else {
+      addLog("ℹ️ Licencja BASIC - dostępne 2 przeglądarki", "info");
+    }
+  } else {
+    document.getElementById("license-key").textContent =
+      "Brak aktywnej licencji";
   }
 });
 
@@ -187,7 +255,14 @@ function getActiveBrowser() {
 }
 
 function updateActiveUI() {
+  // Resetuj aktywną przeglądarkę jeśli jest zamknięta
   if (!isBrowserBOpen && activeBrowserId === "b") {
+    activeBrowserId = "a";
+  }
+  if (!isBrowserCOpen && activeBrowserId === "c") {
+    activeBrowserId = "a";
+  }
+  if (!isBrowserDOpen && activeBrowserId === "d") {
     activeBrowserId = "a";
   }
 
@@ -200,16 +275,37 @@ function updateActiveUI() {
   toggleIsTrusted.checked = getActiveBrowser().isTrustedEnabled;
   updateAutoClickerButton();
 
+  // Zarządzanie widocznością przeglądarek
   browserButtons.b.disabled = !isBrowserBOpen;
+  browserButtons.c.disabled = !isBrowserCOpen;
+  browserButtons.d.disabled = !isBrowserDOpen;
+
   paneB.classList.toggle("is-hidden", !isBrowserBOpen);
-  webviewContainer.classList.toggle("single-mode", !isBrowserBOpen);
-  openBrowserBButton.disabled = isBrowserBOpen;
+  paneC.classList.toggle("is-hidden", !isBrowserCOpen);
+  paneD.classList.toggle("is-hidden", !isBrowserDOpen);
+
+  // Zarządzanie layoutem
+  const openCount =
+    [isBrowserBOpen, isBrowserCOpen, isBrowserDOpen].filter(Boolean).length + 1; // +1 dla A
+  webviewContainer.classList.toggle("single-mode", openCount === 1);
+  webviewContainer.classList.toggle("quad-mode", openCount === 4);
+
+  // Przycisk "+" disabled gdy wszystkie dostępne przeglądarki są otwarte
+  const allBrowsersOpen =
+    (maxBrowsers === 2 && isBrowserBOpen) ||
+    (maxBrowsers === 4 && isBrowserBOpen && isBrowserCOpen && isBrowserDOpen);
+  openBrowserBButton.disabled = allBrowsersOpen;
+
   closeBrowserBButton.disabled = !isBrowserBOpen;
+  closeBrowserCButton.disabled = !isBrowserCOpen;
+  closeBrowserDButton.disabled = !isBrowserDOpen;
 }
 
 function setActiveBrowser(browserId) {
   if (!browsers[browserId]) return;
   if (browserId === "b" && !isBrowserBOpen) return;
+  if (browserId === "c" && !isBrowserCOpen) return;
+  if (browserId === "d" && !isBrowserDOpen) return;
   activeBrowserId = browserId;
   updateActiveUI();
   addLog(
@@ -253,25 +349,81 @@ Object.values(browsers).forEach((browser) => {
 
     // Reset monitoring slotów na nowej stronie
     lastMonitoredSlotsCount = -1;
+
+    // WAŻNE: Jeśli AutoClicker jest włączony, reinicjalizuj go na nowej stronie
+    if (browser.autoClickerEnabled) {
+      console.log("[Navigation] AutoClicker jest włączony, reinicjalizuję...");
+      setTimeout(async () => {
+        // Reinicjalizuj AutoClicker na nowej stronie
+        const isInjected = await injectAutoClicker(browser);
+        if (isInjected) {
+          console.log("[Navigation] AutoClicker reinicjalizowany");
+          const initResult = await initAutoClicker(browser);
+
+          if (initResult === true) {
+            // Czekamy na panel rezerwacji
+            browser.waitingForPanel = true;
+            updateAutoClickerButton();
+            addLog(
+              "⏳ AutoClicker czeka na panel rezerwacji (po nawigacji)",
+              "warning",
+              browser.id,
+            );
+            waitForPanelReady(browser);
+          } else if (initResult === false) {
+            // Panel istniał i inicjalizacja się powiodła
+            browser.waitingForPanel = false;
+            updateAutoClickerButton();
+            updateStatusLight(browser);
+            addLog(
+              "✅ AutoClicker reinicjalizowany (panel znaleziony)",
+              "success",
+              browser.id,
+            );
+          }
+        }
+      }, 500); // Czekaj 500ms żeby strona się załadowała
+    }
   });
 });
 
 browserButtons.a.addEventListener("click", () => setActiveBrowser("a"));
 browserButtons.b.addEventListener("click", () => setActiveBrowser("b"));
+browserButtons.c.addEventListener("click", () => setActiveBrowser("c"));
+browserButtons.d.addEventListener("click", () => setActiveBrowser("d"));
 paneA.addEventListener("mousedown", () => setActiveBrowser("a"));
 paneB.addEventListener("mousedown", () => setActiveBrowser("b"));
+paneC.addEventListener("mousedown", () => setActiveBrowser("c"));
+paneD.addEventListener("mousedown", () => setActiveBrowser("d"));
 
+// Przycisk "+" w panelu A otwiera kolejną przeglądarkę (B -> C -> D)
 openBrowserBButton.addEventListener("click", () => {
-  if (isBrowserBOpen) return;
-  isBrowserBOpen = true;
-  updateActiveUI();
-
-  const defaultUrl = urlInputB.value.trim();
-  if (defaultUrl && webviewB.src === "about:blank") {
-    navigate(browsers.b, defaultUrl);
+  // Sprawdź którą przeglądarkę otworzyć
+  if (!isBrowserBOpen) {
+    isBrowserBOpen = true;
+    updateActiveUI();
+    const defaultUrl = urlInputB.value.trim();
+    if (defaultUrl && webviewB.src === "about:blank") {
+      navigate(browsers.b, defaultUrl);
+    }
+    addLog("✓ Otworzono przegladarke B", "success", "b");
+  } else if (!isBrowserCOpen && maxBrowsers >= 3) {
+    isBrowserCOpen = true;
+    updateActiveUI();
+    const defaultUrl = urlInputC.value.trim();
+    if (defaultUrl && webviewC.src === "about:blank") {
+      navigate(browsers.c, defaultUrl);
+    }
+    addLog("✓ Otworzono przegladarke C", "success", "c");
+  } else if (!isBrowserDOpen && maxBrowsers >= 4) {
+    isBrowserDOpen = true;
+    updateActiveUI();
+    const defaultUrl = urlInputD.value.trim();
+    if (defaultUrl && webviewD.src === "about:blank") {
+      navigate(browsers.d, defaultUrl);
+    }
+    addLog("✓ Otworzono przegladarke D", "success", "d");
   }
-
-  addLog("✓ Otworzono przegladarke B", "success", "b");
 });
 
 closeBrowserBButton.addEventListener("click", () => {
@@ -282,6 +434,26 @@ closeBrowserBButton.addEventListener("click", () => {
   webviewB.src = "about:blank";
   updateActiveUI();
   addLog("✖ Zamknieto przegladarke B", "info", "b");
+});
+
+closeBrowserCButton.addEventListener("click", () => {
+  if (!isBrowserCOpen) return;
+  isBrowserCOpen = false;
+  browsers.c.isTrustedEnabled = false;
+  browsers.c.autoClickerEnabled = false;
+  webviewC.src = "about:blank";
+  updateActiveUI();
+  addLog("✖ Zamknieto przegladarke C", "info", "c");
+});
+
+closeBrowserDButton.addEventListener("click", () => {
+  if (!isBrowserDOpen) return;
+  isBrowserDOpen = false;
+  browsers.d.isTrustedEnabled = false;
+  browsers.d.autoClickerEnabled = false;
+  webviewD.src = "about:blank";
+  updateActiveUI();
+  addLog("✖ Zamknieto przegladarke D", "info", "d");
 });
 
 updateActiveUI();
@@ -415,6 +587,145 @@ devtoolsBtn.addEventListener("click", () => {
   addLog("🔧 DevTools otwarte dla WebView", "info", browser.id);
 });
 
+// ==================== ZARZĄDZANIE LICENCJĄ ====================
+
+// Inicjalizuj przycisk zarządzania licencją
+function initLicenseManagerBtn() {
+  licenseManagerBtn = document.getElementById("license-manager-btn");
+
+  if (licenseManagerBtn) {
+    console.log("✓ License Manager Button znaleziony i inicjalizowany");
+    licenseManagerBtn.addEventListener("click", () => {
+      console.log("Kliknięto License Manager Button");
+      const modal = document.getElementById("license-manager-modal");
+      const iframe = document.getElementById("license-manager-iframe");
+
+      if (modal) {
+        modal.classList.add("active");
+        console.log("Modal pokazany");
+
+        // Debug - sprawdź iframe
+        if (iframe) {
+          console.log("[DEBUG] iframe.src:", iframe.src);
+          console.log("[DEBUG] iframe.contentWindow:", iframe.contentWindow);
+        }
+
+        // Poczekaj chwilę i wyślij wiadomość do iframe aby odświeżyło dane
+        setTimeout(() => {
+          if (iframe && iframe.contentWindow) {
+            iframe.contentWindow.postMessage({ type: "refresh-license" }, "*");
+            console.log("Wysłano refresh-license do iframe");
+          }
+        }, 100);
+      }
+    });
+  } else {
+    console.warn("❌ License Manager Button nie znaleziony w DOM");
+  }
+}
+
+// Załaduj przycisk gdy plik się zaczy
+initLicenseManagerBtn();
+
+// Załaduj ponownie po krótkim opóźnieniu (dla pewności)
+setTimeout(initLicenseManagerBtn, 100);
+
+// ==================== OBSŁUGA KOMUNIKACJI Z MODALEM IFRAME ====================
+
+// Słuchaj wiadomości z iframe license-manager (bardziej fleksybilnie)
+window.addEventListener("message", async (event) => {
+  // Sprawdź czy ma typ (to jest wiadomość z naszego iframe)
+  if (!event.data || !event.data.type) {
+    return;
+  }
+
+  console.log("[License Manager Modal] Otrzymano wiadomość:", event.data.type);
+
+  // Obsługuj różne wiadomości z iframe
+  if (event.data.type === "get-license-info") {
+    try {
+      console.log("[License Manager Modal] Wysyłam informacje o licencji");
+      const licenseInfo = await window.electronAPI.getLicenseInfo();
+
+      // Wyślij odpowiedź z powrotem do iframe
+      const iframeElement = document.getElementById("license-manager-iframe");
+      if (iframeElement && iframeElement.contentWindow) {
+        iframeElement.contentWindow.postMessage(
+          {
+            type: "license-info-response",
+            data: licenseInfo,
+          },
+          "*",
+        );
+        console.log("[License Manager Modal] Odpowiedź wysłana");
+      } else {
+        console.error(
+          "[License Manager Modal] iframe element nie jest dostępny",
+        );
+      }
+    } catch (error) {
+      console.error("[License Manager Modal] Błąd pobierania licencji:", error);
+    }
+  }
+
+  if (event.data.type === "open-license-activation") {
+    console.log("[License Manager Modal] Otwieranie okna aktywacji licencji");
+    try {
+      if (window.electronAPI && window.electronAPI.openLicenseActivation) {
+        window.electronAPI.openLicenseActivation();
+      } else {
+        console.error(
+          "[License Manager Modal] window.electronAPI.openLicenseActivation nie jest dostępny",
+        );
+      }
+    } catch (error) {
+      console.error(
+        "[License Manager Modal] Błąd otwierania okna aktywacji:",
+        error,
+      );
+    }
+  }
+
+  if (event.data.type === "revoke-license") {
+    console.log("[License Manager Modal] Usuwanie licencji");
+    try {
+      const result = await window.electronAPI.revokeLicense();
+
+      const iframeElement = document.getElementById("license-manager-iframe");
+      if (iframeElement && iframeElement.contentWindow) {
+        iframeElement.contentWindow.postMessage(
+          {
+            type: "revoke-license-response",
+            data: result,
+          },
+          "*",
+        );
+      }
+    } catch (error) {
+      console.error("[License Manager Modal] Błąd usuwania licencji:", error);
+    }
+  }
+});
+
+// Nasłuchuj na zmiany licencji
+window.electronAPI.onLicenseUpdated(() => {
+  console.log("[License] Otrzymano powiadomienie o zmianie licencji");
+
+  // Odśwież dane w license-manager iframe jeśli jest otwarty
+  const modal = document.getElementById("license-manager-modal");
+  const iframe = document.getElementById("license-manager-iframe");
+
+  if (
+    modal &&
+    modal.classList.contains("active") &&
+    iframe &&
+    iframe.contentWindow
+  ) {
+    console.log("[License] Odświeżam dane w license-manager iframe");
+    iframe.contentWindow.postMessage({ type: "refresh-license" }, "*");
+  }
+});
+
 // ==================== WEBVIEW - OBSŁUGA ZDARZEŃ ====================
 
 Object.values(browsers).forEach((browser) => {
@@ -496,7 +807,23 @@ function updateAutoClickerButton() {
 }
 
 async function updateStatusLight(browser) {
-  const statusLight = browser.id === "a" ? statusLightA : statusLightB;
+  // Wybierz odpowiedni status light
+  let statusLight;
+  switch (browser.id) {
+    case "a":
+      statusLight = statusLightA;
+      break;
+    case "b":
+      statusLight = statusLightB;
+      break;
+    case "c":
+      statusLight = statusLightC;
+      break;
+    case "d":
+      statusLight = statusLightD;
+      break;
+  }
+
   if (!statusLight) return;
 
   if (!browser.autoClickerEnabled) {
@@ -544,6 +871,17 @@ function startStatusLightMonitor() {
 
 async function injectAutoClicker(browser) {
   try {
+    // Czyszczenie stanu AutoClickera ze starej strony
+    await browser.webview.executeJavaScript(`
+      if (window.AutoClicker && window.AutoClicker.stop) {
+        try {
+          window.AutoClicker.stop();
+        } catch (e) {}
+      }
+      delete window.AutoClicker;
+      delete window.AutoClickerState;
+    `);
+
     if (!autoClickerScript) {
       const response = await fetch("../auto-clicker.js");
       autoClickerScript = await response.text();
@@ -558,59 +896,67 @@ async function injectAutoClicker(browser) {
   }
 }
 
-function initAutoClicker(browser) {
+async function initAutoClicker(browser) {
   try {
-    browser.webview.executeJavaScript(`
+    const result = await browser.webview.executeJavaScript(`
       if (window.AutoClicker) {
-        const result = window.AutoClicker.init();
-        // Zwróć wynik inicjalizacji
-        result;
+        window.AutoClicker.init();
+        // Zwróć czy czekamy na panel
+        window.AutoClicker.waitingForPanel;
+      } else {
+        false;
       }
     `);
+    return result;
   } catch (error) {
     addLog(`✗ Błąd inicjalizacji: ${error.message}`, "error", browser.id);
+    return null;
   }
 }
 
 function waitForPanelReady(browser) {
   // Monitoruj czy panel się pojawił
   let checkCount = 0;
-  const maxChecks = 300; // 5 minut (300 x 1000ms)
+  const maxChecks = 600; // 3 minuty (600 x 500ms)
+  const checkInterval = 500; // sprawdzaj co 500ms zamiast 1000ms
 
   const checkPanel = setInterval(() => {
     checkCount++;
 
     browser.webview
       .executeJavaScript(
-        "window.AutoClicker ? window.AutoClicker.waitingForPanel : null",
+        "window.AutoClicker ? window.AutoClicker.waitingForPanel : 'undefined'",
       )
       .then((waiting) => {
         if (waiting === false) {
           // Panel się pojawił i zainicjalizował!
           clearInterval(checkPanel);
           addLog(
-            "✅ Panel rezerwacji znaleziony i AutoClicker zainicjalizowany",
+            "✅ Panel rezerwacji znaleziony! AutoClicker gotowy do pracy",
             "success",
             browser.id,
           );
-          // UI już powinien być OK bo AutoClicker.init zwrócił true
+          browser.waitingForPanel = false;
+          updateAutoClickerButton();
           updateStatusLight(browser);
         } else if (checkCount >= maxChecks) {
           // Timeout - panel się nie pojawił
           clearInterval(checkPanel);
           browser.autoClickerEnabled = false;
+          browser.waitingForPanel = false;
           updateAutoClickerButton();
           addLog(
-            "⏱️ Timeout: Panel rezerwacji nie pojawił się w ciągu 5 minut",
+            "⏱️ Timeout: Panel rezerwacji nie pojawił się. Wyłączyłem AutoClicker",
             "warning",
             browser.id,
           );
         }
+        // Else: czekamy dalej (waiting === true)
       })
       .catch(() => {
-        // Błąd - zignoruj i próbuj dalej
+        // Ignoruj błędy executeJavaScript
       });
-  }, 1000);
+  }, checkInterval);
 }
 
 toggleAutoClickerBtn.addEventListener("click", async () => {
@@ -641,41 +987,34 @@ toggleAutoClickerBtn.addEventListener("click", async () => {
 
   const isInjected = await injectAutoClicker(browser);
   if (isInjected) {
-    initAutoClicker(browser);
+    const initResult = await initAutoClicker(browser);
 
-    // Czekaj aby sprawdzić wynik inicjalizacji
-    setTimeout(async () => {
-      const initResult = await browser.webview.executeJavaScript(`
-        window.AutoClicker ? window.AutoClicker.waitingForPanel : null
-      `);
-
-      if (initResult === true) {
-        // Czekamy na panel rezerwacji
-        browser.autoClickerEnabled = true;
-        browser.waitingForPanel = true;
-        updateAutoClickerButton();
-        addLog(
-          "⏳ Czekam na panel rezerwacji... Wejdź w panel rezerwacji w serwisie",
-          "warning",
-          browser.id,
-        );
-        // Monitoruj pojawienie się panelu
-        waitForPanelReady(browser);
-      } else if (initResult === false) {
-        // Panel istniał i inicjalizacja się powiodła
-        browser.autoClickerEnabled = true;
-        browser.waitingForPanel = false;
-        updateAutoClickerButton();
-        updateStatusLight(browser);
-        addLog("✅ Auto Clicker włączony i gotowy", "success", browser.id);
-      } else {
-        // Błąd inicjalizacji
-        browser.autoClickerEnabled = false;
-        browser.waitingForPanel = false;
-        updateAutoClickerButton();
-        addLog("✗ Błąd inicjalizacji AutoClickera", "error", browser.id);
-      }
-    }, 100);
+    if (initResult === true) {
+      // Czekamy na panel rezerwacji
+      browser.autoClickerEnabled = true;
+      browser.waitingForPanel = true;
+      updateAutoClickerButton();
+      addLog(
+        "⏳ Czekam na panel rezerwacji... Wejdź w panel rezerwacji w serwisie",
+        "warning",
+        browser.id,
+      );
+      // Monitoruj pojawienie się panelu
+      waitForPanelReady(browser);
+    } else if (initResult === false) {
+      // Panel istniał i inicjalizacja się powiodła
+      browser.autoClickerEnabled = true;
+      browser.waitingForPanel = false;
+      updateAutoClickerButton();
+      updateStatusLight(browser);
+      addLog("✅ Auto Clicker włączony i gotowy", "success", browser.id);
+    } else {
+      // Błąd inicjalizacji
+      browser.autoClickerEnabled = false;
+      browser.waitingForPanel = false;
+      updateAutoClickerButton();
+      addLog("✗ Błąd inicjalizacji AutoClickera", "error", browser.id);
+    }
   } else {
     browser.autoClickerEnabled = false;
     browser.waitingForPanel = false;
@@ -688,7 +1027,11 @@ toggleAutoClickerBtn.addEventListener("click", async () => {
 
 addLog("🚀 Aplikacja uruchomiona", "success");
 addLog(`📍 URL A: ${browsers.a.webview.src}`, "info", "a");
-addLog("📍 Przegladarka B: zamknieta", "info", "b");
+addLog("📍 Przeglądarka B: zamknięta", "info", "b");
+if (maxBrowsers >= 4) {
+  addLog("📍 Przeglądarka C: zamknięta", "info", "c");
+  addLog("📍 Przeglądarka D: zamknięta", "info", "d");
+}
 addLog(
   "💡 Wskazówka: Użyj toggle isTrusted aby nadpisać właściwość event.isTrusted",
   "info",

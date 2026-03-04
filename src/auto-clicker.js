@@ -1385,66 +1385,139 @@
     }
   });
 
+  // Globalny obserwator na pojawienie się panelu rezerwacji
+  // Ten obserwator działa od razu, niezależnie czy AutoClicker jest włączony
+  let globalPanelObserver = null;
+  let globalPollInterval = null;
+  let isInitialized = false; // Flaga zapobiegająca wielokrotnej inicjalizacji
+
+  const stopGlobalPanelMonitoring = () => {
+    if (globalPanelObserver) {
+      globalPanelObserver.disconnect();
+      globalPanelObserver = null;
+      console.log("[DEBUG] AutoClicker: MutationObserver zatrzymany");
+    }
+    if (globalPollInterval) {
+      clearInterval(globalPollInterval);
+      globalPollInterval = null;
+      console.log("[DEBUG] AutoClicker: Global polling zatrzymany");
+    }
+  };
+
+  const startGlobalPanelMonitoring = () => {
+    console.log(
+      "[DEBUG] AutoClicker: Rozpoczynam monitoring panelu rezerwacji...",
+    );
+
+    // MutationObserver
+    globalPanelObserver = new MutationObserver((mutationsList) => {
+      if (isInitialized) return; // Już zainicjalizowany, ignoruj
+
+      const avSlots = document.getElementById("av-slots");
+      if (avSlots) {
+        console.log("[DEBUG] AutoClicker: MutationObserver wykrył #av-slots!");
+        if (window.AutoClicker && window.AutoClicker._pendingInitialize) {
+          window.AutoClicker.waitingForPanel = false;
+          window.AutoClicker._initializeWithPanel();
+        }
+      }
+    });
+
+    globalPanelObserver.observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+    });
+
+    // Polling fallback - co 1s sprawdzaj wszystko
+    globalPollInterval = setInterval(() => {
+      if (isInitialized) return; // Już zainicjalizowany, ignoruj
+
+      // Szukaj #av-slots
+      const avSlots = document.getElementById("av-slots");
+      if (avSlots) {
+        console.log("[DEBUG] Polling: Znaleziony #av-slots! ", avSlots);
+        if (window.AutoClicker && window.AutoClicker._pendingInitialize) {
+          console.log("[DEBUG] Inicjalizuję z polowania...");
+          window.AutoClicker.waitingForPanel = false;
+          window.AutoClicker._initializeWithPanel();
+        }
+        return;
+      }
+
+      // Szukaj innych elementów do diaginostyki
+      const allDivs = document.querySelectorAll(
+        "div[class*='slot'], div[class*='panel'], [class*='modal']",
+      );
+      if (allDivs.length > 0) {
+        const sampleIds = Array.from(allDivs)
+          .slice(0, 5)
+          .map((e) => ({
+            tag: e.tagName,
+            id: e.id,
+            class: e.className.substring(0, 50),
+          }));
+      }
+
+      // Sprawdź czy jest jakikolwiek element z 'av' lub 'slot' w ID
+      const avElements = document.querySelectorAll("[id*='av'], [id*='slot']");
+      if (avElements.length > 0 && Math.random() < 0.1) {
+        // Co 10. raz (rzadko)
+        const ids = Array.from(avElements)
+          .map((e) => e.id)
+          .slice(0, 10);
+        console.log("[DEBUG] Elementy z 'av' lub 'slot':", ids);
+      }
+    }, 1000);
+
+    console.log(
+      "[DEBUG] AutoClicker: Monitoring uruchomiony (observer + polling)",
+    );
+  };
+
+  // Uruchom monitoring od razu
+  startGlobalPanelMonitoring();
+
   // Public API
   window.AutoClicker = {
     init: () => {
       const avSlots = document.querySelector("#av-slots");
 
       if (!avSlots) {
-        // Panel rezerwacji nie istnieje - czekaj na jego pojawienie się
+        // Panel rezerwacji nie istnieje - globalny obserwator już czeka na niego
         console.log(
-          "AutoClicker: Panel rezerwacji nie znaleziony, czekam na jego pojawienie...",
+          "AutoClicker: Panel rezerwacji nie znaleziony, czekam na jego pojawienie się...",
         );
 
-        // Utwórz obserwer który będzie czekać na pojawienie się panelu
-        let panelObserver = null;
-        let observerTimeout = null;
-
-        const watchForPanel = () => {
-          panelObserver = new MutationObserver((mutations) => {
-            if (document.querySelector("#av-slots")) {
-              console.log(
-                "✓ AutoClicker: Panel rezerwacji wykryty! Inicjalizuję...",
-              );
-
-              // Wyczyść obserwer
-              if (panelObserver) {
-                panelObserver.disconnect();
-                panelObserver = null;
-              }
-              if (observerTimeout) {
-                clearTimeout(observerTimeout);
-              }
-
-              // Reinicjalizuj z panelem
-              window.AutoClicker._initializeWithPanel();
-            }
-          });
-
-          panelObserver.observe(document.body, {
-            childList: true,
-            subtree: true,
-          });
-
-          // Timeout - jeśli panel się nie pojawi w ciągu 5 minut, zrezygnuj
-          observerTimeout = setTimeout(
-            () => {
-              if (panelObserver) {
-                panelObserver.disconnect();
-                panelObserver = null;
-                console.log(
-                  "AutoClicker: Timeout - panel rezerwacji nie pojawił się w ciągu 5 minut",
-                );
-              }
-            },
-            5 * 60 * 1000,
-          );
-        };
-
-        // Dodaj sygnał dla UI że czekamy
+        // Ustaw flagę że czekamy
         window.AutoClicker.waitingForPanel = true;
-        window.AutoClicker._watchForPanel = watchForPanel;
-        watchForPanel();
+        window.AutoClicker._pendingInitialize = true;
+
+        // Agresywne polling podczas czekania
+        let waitingPollCount = 0;
+        const waitingPoll = setInterval(() => {
+          waitingPollCount++;
+          const found = document.getElementById("av-slots");
+
+          console.log(
+            `[WAIT] Polling #${waitingPollCount}s: ${found ? "✓ ZNALEZIONO" : "..."}`,
+          );
+
+          if (found) {
+            clearInterval(waitingPoll);
+            console.log("[WAIT] Panel znaleziony!");
+            window.AutoClicker.waitingForPanel = false;
+            window.AutoClicker._pendingInitialize = false;
+            window.AutoClicker._initializeWithPanel();
+          }
+
+          // Timeout 5 minut
+          if (waitingPollCount > 300) {
+            clearInterval(waitingPoll);
+            console.log("[WAIT] Timeout 5 minut");
+            window.AutoClicker.waitingForPanel = false;
+            window.AutoClicker._pendingInitialize = false;
+          }
+        }, 1000);
 
         return false; // Zwróć false - jeszcze się nie zainicjalizował
       }
@@ -1454,6 +1527,16 @@
     },
 
     _initializeWithPanel: () => {
+      // Guard - jeśli już zainicjalizowany, nie rób tego ponownie
+      if (isInitialized) {
+        console.log(
+          "[DEBUG] AutoClicker już zainicjalizowany, pomijam ponowną inicjalizację",
+        );
+        return true;
+      }
+
+      console.log("[DEBUG] AutoClicker: Rozpoczynam inicjalizację...");
+
       // Rzeczywista inicjalizacja gdy panel istnieje
       injectStyles();
       pluginIsOn = true;
@@ -1469,7 +1552,13 @@
 
       startingPlugin();
       startSlotObservers();
+
+      // Oznacz jako zainicjalizowany i zatrzymaj global monitoring
+      isInitialized = true;
       window.AutoClicker.waitingForPanel = false;
+      window.AutoClicker._pendingInitialize = false;
+      stopGlobalPanelMonitoring();
+
       console.log("✓ AutoClicker: Zainicjalizowany");
       return true;
     },

@@ -2,9 +2,11 @@ const { app, BrowserWindow, ipcMain, dialog, session } = require("electron");
 const fs = require("fs");
 const path = require("path");
 const LicenseManager = require("./license/licenseManager");
+const LicenseServer = require("./license/licenseServer");
 
 let mainWindow;
 let licenseManager;
+let licenseServer;
 let cachedAutoClickerAssets;
 
 // Ładowanie wtyczki Chrome
@@ -80,31 +82,80 @@ app.whenReady().then(async () => {
 
   licenseManager = new LicenseManager();
 
+  // Uruchom serwer licencji
+  licenseServer = new LicenseServer(5000);
+  try {
+    await licenseServer.start();
+    console.log("✅ Serwer licencji uruchomiony");
+  } catch (error) {
+    console.error("❌ Błąd uruchomienia serwera licencji:", error);
+  }
+
   // Sprawdź licencję
   if (licenseManager.isValid()) {
     createMainWindow();
   } else {
-    const licenseWindow = createLicenseWindow();
-
-    // Obsługa aktywacji licencji
-    ipcMain.once("license-activated", (event, licenseKey) => {
-      const result = licenseManager.activate(licenseKey);
-
-      if (result.success) {
-        licenseWindow.close();
-        createMainWindow();
-      } else {
-        event.reply("license-error", result.error);
-      }
-    });
+    createLicenseWindow();
   }
 });
 
 // ==================== IPC HANDLERS ====================
 
+// Obsługa aktywacji licencji (zawsze dostępna)
+ipcMain.on("license-activated", (event, licenseKey) => {
+  console.log("[License] Otrzymano żądanie aktywacji:", licenseKey);
+  const result = licenseManager.activate(licenseKey);
+
+  if (result.success) {
+    console.log("[License] Aktywacja sukces - wysyłam potwierdzenie");
+    event.reply("license-success");
+
+    // Zamknij okno aktywacji i otwórz główne (jeśli nie istnieje)
+    setTimeout(() => {
+      const windows = BrowserWindow.getAllWindows();
+      windows.forEach((w) => {
+        if (w.webContents === event.sender) {
+          w.close();
+        }
+      });
+
+      // Otwórz główne okno tylko jeśli jeszcze nie istnieje
+      if (!mainWindow || mainWindow.isDestroyed()) {
+        createMainWindow();
+      } else {
+        // Jeśli główne okno już istnieje, powiadom je o zmianie licencji
+        console.log("[License] Powiadamiam główne okno o zmianie licencji");
+        mainWindow.webContents.send("license-updated");
+      }
+    }, 1000);
+  } else {
+    console.log("[License] Błąd aktywacji:", result.error);
+    event.reply("license-error", result.error);
+  }
+});
+
 // Informacje o licencji
 ipcMain.handle("get-license-info", async () => {
   return licenseManager.getLicenseInfo();
+});
+
+// Otworzenie okna aktywacji licencji
+ipcMain.on("open-license-activation", () => {
+  const licenseWindow = createLicenseWindow();
+});
+
+// Usunięcie licencji
+ipcMain.handle("revoke-license", async () => {
+  return licenseManager.revoke();
+});
+
+// Otworzenie okna zarządzania licencją
+ipcMain.on("open-license-manager", (event) => {
+  console.log("[IPC] Otrzymano żądanie otwarcia License Manager Modal");
+  // Wyślij sygnał do głównego renderer
+  if (mainWindow && mainWindow.webContents) {
+    mainWindow.webContents.send("show-license-manager-modal");
+  }
 });
 
 // Override isTrusted - wstrzykiwanie skryptu
@@ -246,6 +297,13 @@ console.log("✓ IPC: get-autoclicker-assets gotowe");
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     app.quit();
+  }
+});
+
+// Zamknięcie serwera licencji przy zamykaniu aplikacji
+app.on("before-quit", () => {
+  if (licenseServer) {
+    licenseServer.stop();
   }
 });
 

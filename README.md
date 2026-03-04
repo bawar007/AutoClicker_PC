@@ -5,22 +5,38 @@ Aplikacja desktop na Windows do testowania stron internetowych z pełną kontrol
 ## 📋 Cechy
 
 ### ✅ Pełna kontrola nad `event.isTrusted`
+
 - **Override isTrusted**: Wszystkie zdarzenia mogą zgłaszać `isTrusted = true`
 - **Symulacja prawdziwych zdarzeń**: Użycie Chrome DevTools Protocol do generowania rzeczywistych kliknięć systemowych
 - **Wstrzykiwanie skryptów**: Wykonywanie własnych skryptów JavaScript przed załadowaniem strony
 
 ### 🔐 System licencjonowania
+
 - Klucz licencyjny powiązany z Hardware ID (Machine ID)
 - Szyfrowanie lokalne licencji
 - Okres ważności (domyślnie 1 rok)
 - Brak wymagania połączenia z internetem po aktywacji
+- **Dwa typy licencji:**
+  - **BASIC** (`B***-****-****-****`) - max 2 przeglądarki
+  - **GOLD** (`G***-****-****-****`) - max 4 przeglądarki
+
+### 🌐 API Licencji (localhost:5000)
+
+- REST API do sprawdzania statusu licencji
+- Zarządzanie rejestracją przeglądarek
+- Endpoint `/license` zwraca informacje o typie licencji i dostępnych slotach
+- Endpoint `/browser/register` do rejestracji nowych przeglądarek
+- Automatyczne sprawdzanie limitów przeglądarek
+- Zobacz [LICENSE_API.md](LICENSE_API.md) dla pełnej dokumentacji
 
 ### 🔌 Integracja z wtyczką Chrome
+
 - Automatyczne ładowanie Twojej wtyczki AutoClicker
 - Pełna funkcjonalność wtyczki wewnątrz aplikacji
 - Synchronizacja z Chrome Extensions API
 
 ### 🎯 Funkcje testowe
+
 - **Panel kontrolny** z przełącznikami i narzędziami
 - **WebView** z dostępem do DevTools
 - **Recording/Playback** scenariuszy testowych
@@ -30,6 +46,7 @@ Aplikacja desktop na Windows do testowania stron internetowych z pełną kontrol
 ## 🛠️ Instalacja
 
 ### Wymagania
+
 - Node.js >= 16.x
 - npm lub yarn
 - Windows 10/11
@@ -37,17 +54,20 @@ Aplikacja desktop na Windows do testowania stron internetowych z pełną kontrol
 ### Kroki instalacji
 
 1. **Instalacja zależności**
+
 ```powershell
 cd f:\Repozytoria\AutoClicker_windows
 npm install
 ```
 
 2. **Uruchomienie w trybie deweloperskim**
+
 ```powershell
 npm run dev
 ```
 
 3. **Budowanie aplikacji (plik .exe)**
+
 ```powershell
 npm run build:win
 ```
@@ -60,10 +80,16 @@ Plik instalacyjny znajdziesz w `dist/` po zakończeniu budowania.
 
 Klucz licencyjny powinien mieć format: `XXXX-XXXX-XXXX-XXXX` (16 znaków alfanumerycznych, wielkie litery).
 
+**Typy licencji:**
+
+- Klucze zaczynające się na **B** → Licencja BASIC (max 2 przeglądarki)
+- Klucze zaczynające się na **G** → Licencja GOLD (max 4 przeglądarki)
+
 Przykładowe klucze (do testów):
+
 ```
-TEST-1234-ABCD-5678
-DEMO-WXYZ-9876-QRST
+BTEST-1234-ABCD-5678  (BASIC - 2 przeglądarki)
+GTEST-WXYZ-9876-QRST  (GOLD - 4 przeglądarki)
 ```
 
 ### Proces aktywacji
@@ -77,23 +103,53 @@ DEMO-WXYZ-9876-QRST
 ### Struktura pliku licencji
 
 Licencja jest przechowywana w:
+
 ```
 C:\Users\[TwojaNazwa]\AppData\Roaming\web-test-automation-app\license.dat
 ```
 
 Plik jest zaszyfrowany AES-256 z kluczem opartym na Machine ID.
 
+## 🧪 Testowanie API Licencji
+
+Serwer API uruchamia się automatycznie z aplikacją na porcie **5000**.
+
+### Szybki test
+
+```powershell
+# Po uruchomieniu aplikacji, w nowym terminalu:
+npm run test:api
+```
+
+### Ręczne testowanie
+
+```powershell
+# Sprawdź status licencji
+curl http://localhost:5000/license
+
+# Zarejestruj przeglądarkę
+curl -X POST http://localhost:5000/browser/register -H "Content-Type: application/json" -d "{\"browserId\": \"test-browser-1\"}"
+
+# Sprawdź health
+curl http://localhost:5000/health
+```
+
+Pełna dokumentacja API znajduje się w pliku [LICENSE_API.md](LICENSE_API.md).
+
 ## 📖 Jak używać
 
 ### 1. Override `isTrusted`
 
-W panelu bocznym włącz przełącznik **"Override isTrusted"**. 
+W panelu bocznym włącz przełącznik **"Override isTrusted"**.
 
 To wstrzyknie skrypt, który:
+
 ```javascript
 // Nadpisuje właściwość isTrusted dla wszystkich eventów
-Object.defineProperty(MouseEvent.prototype, 'isTrusted', {
-  get: function() { return true; }
+Object.defineProperty(MouseEvent.prototype, "isTrusted", {
+  get: function () {
+    return true;
+  },
 });
 ```
 
@@ -105,7 +161,7 @@ W sekcji **"Wstrzykiwanie Skryptów"** wpisz kod JavaScript:
 
 ```javascript
 // Przykład: Kliknij wszystkie przyciski
-document.querySelectorAll('button').forEach(btn => btn.click());
+document.querySelectorAll("button").forEach((btn) => btn.click());
 ```
 
 Kliknij **"Wykonaj Skrypt"**. Wynik pojawi się w logach.
@@ -115,6 +171,7 @@ Kliknij **"Wykonaj Skrypt"**. Wynik pojawi się w logach.
 Kliknij **"Symuluj Prawdziwe Kliknięcie"** aby użyć Chrome DevTools Protocol.
 
 To generuje **PRAWDZIWE** zdarzenie na poziomie przeglądarki (nie JavaScript), więc:
+
 - `event.isTrusted` === `true` (bez overridu)
 - Nie da się odróżnić od rzeczywistego kliknięcia użytkownika
 
@@ -126,6 +183,7 @@ To generuje **PRAWDZIWE** zdarzenie na poziomie przeglądarki (nie JavaScript), 
 4. Użyj **"Importuj Scenariusz"** aby wczytać i odtworzyć
 
 Przykładowy scenariusz:
+
 ```json
 {
   "actions": [
@@ -156,39 +214,42 @@ Stwórz plik `test.html`:
 ```html
 <!DOCTYPE html>
 <html>
-<body>
-  <button id="testBtn">Kliknij mnie</button>
-  <div id="result"></div>
+  <body>
+    <button id="testBtn">Kliknij mnie</button>
+    <div id="result"></div>
 
-  <script>
-    document.getElementById('testBtn').addEventListener('click', (e) => {
-      const result = document.getElementById('result');
-      result.innerHTML = `
+    <script>
+      document.getElementById("testBtn").addEventListener("click", (e) => {
+        const result = document.getElementById("result");
+        result.innerHTML = `
         <h2>Rezultat:</h2>
         <p><strong>isTrusted:</strong> ${e.isTrusted}</p>
         <p><strong>Typ:</strong> ${e.type}</p>
-        <p style="color: ${e.isTrusted ? 'green' : 'red'}">
-          ${e.isTrusted ? '✓ Zaufane zdarzenie' : '✗ Niezaufane zdarzenie'}
+        <p style="color: ${e.isTrusted ? "green" : "red"}">
+          ${e.isTrusted ? "✓ Zaufane zdarzenie" : "✗ Niezaufane zdarzenie"}
         </p>
       `;
-    });
-  </script>
-</body>
+      });
+    </script>
+  </body>
 </html>
 ```
 
 ### Test 1: Bez override
+
 1. Załaduj `test.html` w aplikacji
 2. W konsoli wykonaj: `document.getElementById('testBtn').click();`
 3. Wynik: `isTrusted = false` ❌
 
 ### Test 2: Z override
+
 1. Włącz **"Override isTrusted"**
 2. Przeładuj stronę
 3. W konsoli wykonaj: `document.getElementById('testBtn').click();`
 4. Wynik: `isTrusted = true` ✅
 
 ### Test 3: Prawdziwe kliknięcie (CDP)
+
 1. Użyj **"Symuluj Prawdziwe Kliknięcie"**
 2. Wynik: `isTrusted = true` ✅ (bez override!)
 
@@ -222,10 +283,10 @@ Edytuj [renderer.js](src/ui/renderer.js) i dodaj w sekcji `exampleScripts`:
 
 ```javascript
 const exampleScripts = {
-  'Mój skrypt': `
+  "Mój skrypt": `
     // Twój kod
     console.log('Hello from custom script');
-  `
+  `,
 };
 ```
 
@@ -236,10 +297,10 @@ Możesz dodać komunikację z zewnętrznym API:
 ```javascript
 // W renderer.js
 async function verifyLicenseOnline(key) {
-  const response = await fetch('https://api.autoclicker.pl/verify', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ code: key })
+  const response = await fetch("https://api.autoclicker.pl/verify", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code: key }),
   });
   return await response.json();
 }
@@ -248,15 +309,17 @@ async function verifyLicenseOnline(key) {
 ### Robot.js dla symulacji systemowej
 
 Zainstaluj `robotjs`:
+
 ```powershell
 npm install robotjs
 ```
 
 W [main.js](src/main.js):
-```javascript
-const robot = require('robotjs');
 
-ipcMain.handle('system-click', async (event, { x, y }) => {
+```javascript
+const robot = require("robotjs");
+
+ipcMain.handle("system-click", async (event, { x, y }) => {
   robot.moveMouse(x, y);
   robot.mouseClick();
   return { success: true };
@@ -266,18 +329,22 @@ ipcMain.handle('system-click', async (event, { x, y }) => {
 ## 🐛 Rozwiązywanie problemów
 
 ### Wtyczka nie ładuje się
+
 - Sprawdź czy folder `chrome-extension` zawiera `manifest.json`
 - Uruchom z `npm run dev` i sprawdź console
 
 ### Licencja nie aktywuje się
+
 - Sprawdź format klucza: `XXXX-XXXX-XXXX-XXXX`
 - Upewnij się że znaki są wielkie (A-Z, 0-9)
 
 ### isTrusted override nie działa
+
 - Przeładuj stronę po włączeniu togglea
 - Sprawdź logi w DevTools (F12)
 
 ### Błąd podczas budowania
+
 ```powershell
 # Wyczyść cache i przebuduj
 Remove-Item -Recurse -Force node_modules
@@ -292,6 +359,7 @@ MIT License - możesz swobodnie modyfikować i dystrybuować.
 ## 👨‍💻 Wsparcie
 
 W razie pytań lub problemów:
+
 - Sprawdź logi w aplikacji (panel boczny)
 - Użyj DevTools (Ctrl+Shift+I)
 - Uruchom w trybie dev: `npm run dev`

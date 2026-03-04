@@ -1,49 +1,58 @@
-const { machineIdSync } = require('node-machine-id');
-const path = require('path');
-const fs = require('fs');
-const crypto = require('crypto');
+const { machineIdSync } = require("node-machine-id");
+const path = require("path");
+const fs = require("fs");
+const crypto = require("crypto");
 
 class LicenseManager {
   constructor() {
-    this.licenseFile = path.join(require('electron').app.getPath('userData'), 'license.dat');
+    this.licenseFile = path.join(
+      require("electron").app.getPath("userData"),
+      "license.dat",
+    );
     this.machineId = this.getMachineId();
+
+    // Typy licencji
+    this.LICENSE_TYPES = {
+      BASIC: { name: "BASIC", maxBrowsers: 2 },
+      GOLD: { name: "GOLD", maxBrowsers: 4 },
+    };
   }
 
   getMachineId() {
     try {
       return machineIdSync({ original: true });
     } catch (error) {
-      console.error('Błąd pobierania Machine ID:', error);
+      console.error("Błąd pobierania Machine ID:", error);
       return null;
     }
   }
 
   // Szyfrowanie licencji
   encrypt(text) {
-    const algorithm = 'aes-256-cbc';
-    const key = crypto.scryptSync(this.machineId || 'default-key', 'salt', 32);
+    const algorithm = "aes-256-cbc";
+    const key = crypto.scryptSync(this.machineId || "default-key", "salt", 32);
     const iv = crypto.randomBytes(16);
-    
+
     const cipher = crypto.createCipheriv(algorithm, key, iv);
-    let encrypted = cipher.update(text, 'utf8', 'hex');
-    encrypted += cipher.final('hex');
-    
-    return iv.toString('hex') + ':' + encrypted;
+    let encrypted = cipher.update(text, "utf8", "hex");
+    encrypted += cipher.final("hex");
+
+    return iv.toString("hex") + ":" + encrypted;
   }
 
   // Deszyfrowanie licencji
   decrypt(text) {
-    const algorithm = 'aes-256-cbc';
-    const key = crypto.scryptSync(this.machineId || 'default-key', 'salt', 32);
-    
-    const parts = text.split(':');
-    const iv = Buffer.from(parts.shift(), 'hex');
-    const encryptedText = parts.join(':');
-    
+    const algorithm = "aes-256-cbc";
+    const key = crypto.scryptSync(this.machineId || "default-key", "salt", 32);
+
+    const parts = text.split(":");
+    const iv = Buffer.from(parts.shift(), "hex");
+    const encryptedText = parts.join(":");
+
     const decipher = crypto.createDecipheriv(algorithm, key, iv);
-    let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
-    decrypted += decipher.final('utf8');
-    
+    let decrypted = decipher.update(encryptedText, "hex", "utf8");
+    decrypted += decipher.final("utf8");
+
     return decrypted;
   }
 
@@ -54,26 +63,64 @@ class LicenseManager {
     return regex.test(key);
   }
 
+  // Określenie typu licencji na podstawie klucza
+  getLicenseType(key) {
+    // Typy licencji na podstawie początkowych znaków klucza:
+    // BASIC: klucze zaczynające się na B (np. BXXX-...)
+    // GOLD: klucze zaczynające się na G (np. GXXX-...)
+
+    if (!key || key.length === 0) {
+      return this.LICENSE_TYPES.BASIC; // Domyślnie BASIC
+    }
+
+    const firstChar = key.charAt(0).toUpperCase();
+
+    if (firstChar === "G") {
+      return this.LICENSE_TYPES.GOLD;
+    } else if (firstChar === "B") {
+      return this.LICENSE_TYPES.BASIC;
+    }
+
+    // Dla kluczy nie zaczynających się na B lub G - BASIC jako domyślny
+    return this.LICENSE_TYPES.BASIC;
+  }
+
   // Aktywacja licencji
   activate(licenseKey) {
     if (!this.validateLicenseKey(licenseKey)) {
-      return { success: false, error: 'Nieprawidłowy format klucza licencyjnego' };
+      return {
+        success: false,
+        error: "Nieprawidłowy format klucza licencyjnego",
+      };
     }
 
     try {
+      const licenseType = this.getLicenseType(licenseKey);
+
       const licenseData = {
         key: licenseKey,
+        licenseType: licenseType.name,
+        maxBrowsers: licenseType.maxBrowsers,
         machineId: this.machineId,
         activatedAt: new Date().toISOString(),
-        expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString() // 1 rok
+        expiresAt: new Date(
+          Date.now() + 365 * 24 * 60 * 60 * 1000,
+        ).toISOString(), // 1 rok
       };
 
       const encrypted = this.encrypt(JSON.stringify(licenseData));
-      fs.writeFileSync(this.licenseFile, encrypted, 'utf8');
+      fs.writeFileSync(this.licenseFile, encrypted, "utf8");
 
-      return { success: true };
+      return {
+        success: true,
+        licenseType: licenseType.name,
+        maxBrowsers: licenseType.maxBrowsers,
+      };
     } catch (error) {
-      return { success: false, error: 'Błąd zapisu licencji: ' + error.message };
+      return {
+        success: false,
+        error: "Błąd zapisu licencji: " + error.message,
+      };
     }
   }
 
@@ -84,7 +131,7 @@ class LicenseManager {
         return false;
       }
 
-      const encrypted = fs.readFileSync(this.licenseFile, 'utf8');
+      const encrypted = fs.readFileSync(this.licenseFile, "utf8");
       const decrypted = this.decrypt(encrypted);
       const licenseData = JSON.parse(decrypted);
 
@@ -101,7 +148,7 @@ class LicenseManager {
 
       return true;
     } catch (error) {
-      console.error('Błąd walidacji licencji:', error);
+      console.error("Błąd walidacji licencji:", error);
       return false;
     }
   }
@@ -110,22 +157,46 @@ class LicenseManager {
   getLicenseInfo() {
     try {
       if (!fs.existsSync(this.licenseFile)) {
-        return { valid: false, message: 'Brak licencji' };
+        return {
+          isActive: false,
+          message: "Brak licencji",
+          licenseType: null,
+          maxBrowsers: 0,
+        };
       }
 
-      const encrypted = fs.readFileSync(this.licenseFile, 'utf8');
+      const encrypted = fs.readFileSync(this.licenseFile, "utf8");
       const decrypted = this.decrypt(encrypted);
       const licenseData = JSON.parse(decrypted);
 
+      // Sprawdź ważność
+      const isValid = this.isValid();
+
+      // Jeśli stara licencja bez typu, dodaj domyślny BASIC
+      if (!licenseData.licenseType) {
+        const licenseType = this.getLicenseType(licenseData.key);
+        licenseData.licenseType = licenseType.name;
+        licenseData.maxBrowsers = licenseType.maxBrowsers;
+      }
+
       return {
-        valid: true,
+        isActive: isValid,
+        valid: isValid, // backward compatibility
         key: licenseData.key,
+        licenseType: licenseData.licenseType,
+        maxBrowsers: licenseData.maxBrowsers,
         activatedAt: licenseData.activatedAt,
         expiresAt: licenseData.expiresAt,
-        machineId: this.machineId
+        machineId: this.machineId,
       };
     } catch (error) {
-      return { valid: false, message: 'Błąd odczytu licencji' };
+      return {
+        isActive: false,
+        valid: false,
+        message: "Błąd odczytu licencji",
+        licenseType: null,
+        maxBrowsers: 0,
+      };
     }
   }
 

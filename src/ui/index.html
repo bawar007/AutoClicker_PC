@@ -53,6 +53,130 @@
         font-size: 11px;
       }
 
+      .license-manager-btn {
+        padding: 6px 12px;
+        background: #667eea;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-size: 12px;
+        cursor: pointer;
+        transition: all 0.3s;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        font-weight: bold;
+      }
+
+      .license-manager-btn:hover {
+        background: #764ba2;
+        transform: translateY(-1px);
+        box-shadow: 0 3px 8px rgba(102, 126, 234, 0.4);
+      }
+
+      .license-manager-btn:active {
+        transform: translateY(0);
+      }
+
+      /* ===== MODAL LICENSE MANAGER ===== */
+      .modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.7);
+        z-index: 1000;
+        animation: fadeIn 0.3s ease;
+      }
+
+      .modal-overlay.active {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+
+      .modal-content {
+        background: #1a1a1a;
+        border-radius: 12px;
+        width: 90%;
+        max-width: 650px;
+        height: 90vh;
+        max-height: 900px;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        animation: slideIn 0.3s ease;
+      }
+
+      @keyframes slideIn {
+        from {
+          transform: translateY(-50px);
+          opacity: 0;
+        }
+        to {
+          transform: translateY(0);
+          opacity: 1;
+        }
+      }
+
+      .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 20px;
+        border-bottom: 2px solid #333;
+        background: #2d2d2d;
+      }
+
+      .modal-header h2 {
+        color: #667eea;
+        margin: 0;
+        font-size: 20px;
+      }
+
+      .modal-close-btn {
+        background: #f44336;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: bold;
+        transition: all 0.3s;
+      }
+
+      .modal-close-btn:hover {
+        background: #da190b;
+        transform: scale(1.05);
+      }
+
+      .modal-body {
+        flex: 1;
+        overflow-y: auto;
+      }
+
+      .modal-body iframe {
+        width: 100%;
+        height: 100%;
+        border: none;
+        background: #1a1a1a;
+        display: block;
+        position: relative;
+        z-index: 1;
+      }
+
       /* ===== MAIN CONTAINER ===== */
       .main-container {
         display: flex;
@@ -324,10 +448,22 @@
         background: #1a1a1a;
         display: flex;
         flex-direction: row;
+        flex-wrap: wrap;
       }
 
       .webview-container.single-mode .webview-pane {
         flex: 1;
+      }
+
+      /* Dla 4 przeglądarek - grid 2x2 */
+      .webview-container.quad-mode {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: 1fr 1fr;
+      }
+
+      .webview-container.quad-mode .webview-pane {
+        flex: none;
       }
 
       .webview-pane {
@@ -335,10 +471,16 @@
         display: flex;
         flex-direction: column;
         border-left: 1px solid #333;
+        border-top: 1px solid #333;
       }
 
       .webview-pane:first-child {
         border-left: none;
+        border-top: none;
+      }
+
+      .webview-pane:nth-child(2) {
+        border-top: none;
       }
 
       .webview-pane.active-pane {
@@ -449,6 +591,13 @@
         <div class="status-indicator"></div>
         <span>Licencja: <span id="license-key">Ładowanie...</span></span>
         <span class="license-badge">AKTYWNA</span>
+        <button
+          class="license-manager-btn"
+          id="license-manager-btn"
+          title="Zarządzanie licencją"
+        >
+          🔐 Zarządzaj
+        </button>
       </div>
     </div>
 
@@ -467,6 +616,20 @@
             </button>
             <button class="btn btn-secondary btn-small" id="browser-b-btn">
               Przeglądarka B
+            </button>
+            <button
+              class="btn btn-secondary btn-small"
+              id="browser-c-btn"
+              style="display: none"
+            >
+              Przeglądarka C
+            </button>
+            <button
+              class="btn btn-secondary btn-small"
+              id="browser-d-btn"
+              style="display: none"
+            >
+              Przeglądarka D
             </button>
           </div>
           <p style="font-size: 11px; color: #888; margin-top: 8px">
@@ -654,10 +817,176 @@
             partition="persist:browser-b"
           ></webview>
         </div>
+
+        <div class="webview-pane is-hidden" id="pane-c">
+          <div class="url-bar">
+            <input
+              type="text"
+              class="url-input"
+              id="url-input-c"
+              placeholder="Wpisz adres URL (np. https://ebrama.baltichub.com)"
+              value="https://www.google.com"
+            />
+            <button class="url-btn open-www" id="go-btn-c" title="Otwórz URL">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                x="0px"
+                y="0px"
+                width="30"
+                height="30"
+                viewBox="0 0 64 64"
+                fill="currentColor"
+              >
+                <path
+                  d="M 40 10 C 38.896 10 38 10.896 38 12 C 38 13.104 38.896 14 40 14 L 47.171875 14 L 30.585938 30.585938 C 29.804938 31.366938 29.804938 32.633063 30.585938 33.414062 C 30.976938 33.805063 31.488 34 32 34 C 32.512 34 33.023063 33.805062 33.414062 33.414062 L 50 16.828125 L 50 24 C 50 25.104 50.896 26 52 26 C 53.104 26 54 25.104 54 24 L 54 12 C 54 10.896 53.104 10 52 10 L 40 10 z M 18 12 C 14.691 12 12 14.691 12 18 L 12 46 C 12 49.309 14.691 52 18 52 L 46 52 C 49.309 52 52 49.309 52 46 L 52 34 C 52 32.896 51.104 32 50 32 C 48.896 32 48 32.896 48 34 L 48 46 C 48 47.103 47.103 48 46 48 L 18 48 C 16.897 48 16 47.103 16 46 L 16 18 C 16 16.897 16.897 16 18 16 L 30 16 C 31.104 16 32 15.104 32 14 C 32 12.896 31.104 12 30 12 L 18 12 z"
+                ></path>
+              </svg>
+            </button>
+            <button
+              class="url-btn refresh-btn"
+              id="refresh-btn-c"
+              title="Odśwież stronę"
+            >
+              <svg
+                fill="currentColor"
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 30 30"
+                width="25px"
+                height="25px"
+              >
+                <path
+                  d="M 15 3 C 12.031398 3 9.3028202 4.0834384 7.2070312 5.875 A 1.0001 1.0001 0 1 0 8.5058594 7.3945312 C 10.25407 5.9000929 12.516602 5 15 5 C 20.19656 5 24.450989 8.9379267 24.951172 14 L 22 14 L 26 20 L 30 14 L 26.949219 14 C 26.437925 7.8516588 21.277839 3 15 3 z M 4 10 L 0 16 L 3.0507812 16 C 3.562075 22.148341 8.7221607 27 15 27 C 17.968602 27 20.69718 25.916562 22.792969 24.125 A 1.0001 1.0001 0 1 0 21.494141 22.605469 C 19.74593 24.099907 17.483398 25 15 25 C 9.80344 25 5.5490109 21.062074 5.0488281 16 L 8 16 L 4 10 z"
+                />
+              </svg>
+            </button>
+            <button
+              class="url-btn open-cart"
+              id="close-browser-c-btn"
+              title="Zamknij kartę"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                style="width: 30px; height: 30px"
+              >
+                <path
+                  d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
+                />
+              </svg>
+            </button>
+            <div
+              class="status-light"
+              id="status-light-c"
+              title="AutoClicker: wyłączony"
+            ></div>
+          </div>
+          <webview
+            id="webview-c"
+            src="about:blank"
+            partition="persist:browser-c"
+          ></webview>
+        </div>
+
+        <div class="webview-pane is-hidden" id="pane-d">
+          <div class="url-bar">
+            <input
+              type="text"
+              class="url-input"
+              id="url-input-d"
+              placeholder="Wpisz adres URL (np. https://ebrama.baltichub.com)"
+              value="https://www.google.com"
+            />
+            <button class="url-btn open-www" id="go-btn-d" title="Otwórz URL">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                x="0px"
+                y="0px"
+                width="30"
+                height="30"
+                viewBox="0 0 64 64"
+                fill="currentColor"
+              >
+                <path
+                  d="M 40 10 C 38.896 10 38 10.896 38 12 C 38 13.104 38.896 14 40 14 L 47.171875 14 L 30.585938 30.585938 C 29.804938 31.366938 29.804938 32.633063 30.585938 33.414062 C 30.976938 33.805063 31.488 34 32 34 C 32.512 34 33.023063 33.805062 33.414062 33.414062 L 50 16.828125 L 50 24 C 50 25.104 50.896 26 52 26 C 53.104 26 54 25.104 54 24 L 54 12 C 54 10.896 53.104 10 52 10 L 40 10 z M 18 12 C 14.691 12 12 14.691 12 18 L 12 46 C 12 49.309 14.691 52 18 52 L 46 52 C 49.309 52 52 49.309 52 46 L 52 34 C 52 32.896 51.104 32 50 32 C 48.896 32 48 32.896 48 34 L 48 46 C 48 47.103 47.103 48 46 48 L 18 48 C 16.897 48 16 47.103 16 46 L 16 18 C 16 16.897 16.897 16 18 16 L 30 16 C 31.104 16 32 15.104 32 14 C 32 12.896 31.104 12 30 12 L 18 12 z"
+                ></path>
+              </svg>
+            </button>
+            <button
+              class="url-btn refresh-btn"
+              id="refresh-btn-d"
+              title="Odśwież stronę"
+            >
+              <svg
+                fill="currentColor"
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 30 30"
+                width="25px"
+                height="25px"
+              >
+                <path
+                  d="M 15 3 C 12.031398 3 9.3028202 4.0834384 7.2070312 5.875 A 1.0001 1.0001 0 1 0 8.5058594 7.3945312 C 10.25407 5.9000929 12.516602 5 15 5 C 20.19656 5 24.450989 8.9379267 24.951172 14 L 22 14 L 26 20 L 30 14 L 26.949219 14 C 26.437925 7.8516588 21.277839 3 15 3 z M 4 10 L 0 16 L 3.0507812 16 C 3.562075 22.148341 8.7221607 27 15 27 C 17.968602 27 20.69718 25.916562 22.792969 24.125 A 1.0001 1.0001 0 1 0 21.494141 22.605469 C 19.74593 24.099907 17.483398 25 15 25 C 9.80344 25 5.5490109 21.062074 5.0488281 16 L 8 16 L 4 10 z"
+                />
+              </svg>
+            </button>
+            <button
+              class="url-btn open-cart"
+              id="close-browser-d-btn"
+              title="Zamknij kartę"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                style="width: 30px; height: 30px"
+              >
+                <path
+                  d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
+                />
+              </svg>
+            </button>
+            <div
+              class="status-light"
+              id="status-light-d"
+              title="AutoClicker: wyłączony"
+            ></div>
+          </div>
+          <webview
+            id="webview-d"
+            src="about:blank"
+            partition="persist:browser-d"
+          ></webview>
+        </div>
       </div>
     </div>
 
     <script src="../auto-clicker.js"></script>
     <script src="renderer.js"></script>
   </body>
+
+  <!-- MODAL LICENSE MANAGER -->
+  <div id="license-manager-modal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>🔐 Zarządzanie Licencją</h2>
+        <button
+          class="modal-close-btn"
+          onclick="
+            document
+              .getElementById('license-manager-modal')
+              .classList.remove('active')
+          "
+        >
+          ✕ Zamknij
+        </button>
+      </div>
+      <div class="modal-body">
+        <iframe
+          id="license-manager-iframe"
+          src="license-manager.html"
+          title="License Manager"
+        ></iframe>
+      </div>
+    </div>
+  </div>
 </html>

@@ -6,8 +6,15 @@ contextBridge.exposeInMainWorld("electronAPI", {
   activateLicense: (key) => ipcRenderer.send("license-activated", key),
   onLicenseError: (callback) =>
     ipcRenderer.on("license-error", (event, error) => callback(error)),
+  onLicenseSuccess: (callback) =>
+    ipcRenderer.on("license-success", () => callback()),
+  onLicenseUpdated: (callback) =>
+    ipcRenderer.on("license-updated", () => callback()),
   getLicenseInfo: () => ipcRenderer.invoke("get-license-info"),
   getMachineId: () => ipcRenderer.invoke("get-machine-id"),
+  openLicenseActivation: () => ipcRenderer.send("open-license-activation"),
+  openLicenseManager: () => ipcRenderer.send("open-license-manager"),
+  revokeLicense: () => ipcRenderer.invoke("revoke-license"),
 
   // ===== MANIPULACJA ISTRUSTED =====
   toggleIsTrustedOverride: (enabled) =>
