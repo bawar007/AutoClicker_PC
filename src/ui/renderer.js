@@ -1,19 +1,57 @@
 // ==================== RENDERER.JS ====================
 // Logika interfejsu głównego okna aplikacji
 
+import { renderWebviewPanes } from "./components/webview-pane.js";
+
+const webviewContainer = document.getElementById("webview-container");
+
+// Panele a/b/c/d nie są już powielane w index.html - budujemy je tutaj z jednego szablonu
+renderWebviewPanes(webviewContainer, [
+  {
+    id: "a",
+    label: "A",
+    isPrimary: true,
+    urlInputValue: "https://ebrama.baltichub.com",
+    webviewSrc: "https://ebrama.baltichub.com",
+  },
+  {
+    id: "b",
+    label: "B",
+    urlInputValue: "https://www.google.com",
+    webviewSrc: "https://ebrama.baltichub.com/",
+  },
+  {
+    id: "c",
+    label: "C",
+    urlInputValue: "https://www.google.com",
+    webviewSrc: "https://ebrama.baltichub.com/",
+  },
+  {
+    id: "d",
+    label: "D",
+    urlInputValue: "https://www.google.com",
+    webviewSrc: "https://ebrama.baltichub.com/",
+  },
+]);
+
 const paneA = document.getElementById("pane-a");
 const paneB = document.getElementById("pane-b");
 const paneC = document.getElementById("pane-c");
 const paneD = document.getElementById("pane-d");
-const webviewContainer = document.getElementById("webview-container");
 const browserButtonA = document.getElementById("browser-a-btn");
 const browserButtonB = document.getElementById("browser-b-btn");
 const browserButtonC = document.getElementById("browser-c-btn");
 const browserButtonD = document.getElementById("browser-d-btn");
-const openBrowserBButton = document.getElementById("open-browser-b-btn");
+const addTabBBtn = document.getElementById("add-tab-b-btn");
+const addTabCBtn = document.getElementById("add-tab-c-btn");
+const addTabDBtn = document.getElementById("add-tab-d-btn");
 const closeBrowserBButton = document.getElementById("close-browser-b-btn");
 const closeBrowserCButton = document.getElementById("close-browser-c-btn");
 const closeBrowserDButton = document.getElementById("close-browser-d-btn");
+const minimizeBtnA = document.getElementById("minimize-btn-a");
+const minimizeBtnB = document.getElementById("minimize-btn-b");
+const minimizeBtnC = document.getElementById("minimize-btn-c");
+const minimizeBtnD = document.getElementById("minimize-btn-d");
 const webviewA = document.getElementById("webview-a");
 const webviewB = document.getElementById("webview-b");
 const webviewC = document.getElementById("webview-c");
@@ -200,6 +238,15 @@ let isBrowserBOpen = false;
 let isBrowserCOpen = false;
 let isBrowserDOpen = false;
 let maxBrowsers = 2; // Domyślnie BASIC (2 przeglądarki)
+let focusedBrowserId = null; // Karta wyświetlana w trybie podglądu na cały obszar
+
+function isBrowserOpen(id) {
+  if (id === "a") return true;
+  if (id === "b") return isBrowserBOpen;
+  if (id === "c") return isBrowserCOpen;
+  if (id === "d") return isBrowserDOpen;
+  return false;
+}
 
 // ==================== INICJALIZACJA ====================
 
@@ -265,6 +312,9 @@ function updateActiveUI() {
   if (!isBrowserDOpen && activeBrowserId === "d") {
     activeBrowserId = "a";
   }
+  if (focusedBrowserId && !isBrowserOpen(focusedBrowserId)) {
+    focusedBrowserId = null;
+  }
 
   Object.values(browsers).forEach((browser) => {
     const isActive = browser.id === activeBrowserId;
@@ -280,25 +330,49 @@ function updateActiveUI() {
   browserButtons.c.disabled = !isBrowserCOpen;
   browserButtons.d.disabled = !isBrowserDOpen;
 
-  paneB.classList.toggle("is-hidden", !isBrowserBOpen);
-  paneC.classList.toggle("is-hidden", !isBrowserCOpen);
-  paneD.classList.toggle("is-hidden", !isBrowserDOpen);
+  // Puste sloty (bez otwartej karty) pokazują przycisk "+"
+  paneB.classList.toggle("pane-empty", !isBrowserBOpen);
+  paneC.classList.toggle("pane-empty", !isBrowserCOpen);
+  paneD.classList.toggle("pane-empty", !isBrowserDOpen);
 
-  // Zarządzanie layoutem
-  const openCount =
-    [isBrowserBOpen, isBrowserCOpen, isBrowserDOpen].filter(Boolean).length + 1; // +1 dla A
-  webviewContainer.classList.toggle("single-mode", openCount === 1);
-  webviewContainer.classList.toggle("quad-mode", openCount === 4);
-
-  // Przycisk "+" disabled gdy wszystkie dostępne przeglądarki są otwarte
-  const allBrowsersOpen =
-    (maxBrowsers === 2 && isBrowserBOpen) ||
-    (maxBrowsers === 4 && isBrowserBOpen && isBrowserCOpen && isBrowserDOpen);
-  openBrowserBButton.disabled = allBrowsersOpen;
+  addTabCBtn.disabled = maxBrowsers < 3;
+  addTabDBtn.disabled = maxBrowsers < 4;
+  addTabCBtn.title =
+    maxBrowsers < 3 ? "Wymaga licencji GOLD" : "Otwórz nową kartę";
+  addTabDBtn.title =
+    maxBrowsers < 4 ? "Wymaga licencji GOLD" : "Otwórz nową kartę";
 
   closeBrowserBButton.disabled = !isBrowserBOpen;
   closeBrowserCButton.disabled = !isBrowserCOpen;
   closeBrowserDButton.disabled = !isBrowserDOpen;
+
+  // Tryb podglądu: aktywna karta na cały obszar, reszta jako mini kafelki
+  // Sloty mini są przypisane na stałe do id (pane-a/b/c/d), więc nie przeskakują przy zmianie fokusu
+  webviewContainer.classList.toggle("focus-mode", !!focusedBrowserId);
+
+  Object.values(browsers).forEach((browser) => {
+    browser.pane.classList.remove("role-main", "is-mini");
+  });
+
+  if (focusedBrowserId) {
+    browsers[focusedBrowserId].pane.classList.add("role-main");
+    ["a", "b", "c", "d"]
+      .filter((id) => id !== focusedBrowserId)
+      .forEach((id) => {
+        browsers[id].pane.classList.add("is-mini");
+      });
+  }
+}
+
+function enterFocusMode(id) {
+  if (!isBrowserOpen(id)) return;
+  focusedBrowserId = id;
+  setActiveBrowser(id);
+}
+
+function exitFocusMode() {
+  focusedBrowserId = null;
+  updateActiveUI();
 }
 
 function setActiveBrowser(browserId) {
@@ -391,42 +465,67 @@ browserButtons.a.addEventListener("click", () => setActiveBrowser("a"));
 browserButtons.b.addEventListener("click", () => setActiveBrowser("b"));
 browserButtons.c.addEventListener("click", () => setActiveBrowser("c"));
 browserButtons.d.addEventListener("click", () => setActiveBrowser("d"));
-paneA.addEventListener("mousedown", () => setActiveBrowser("a"));
-paneB.addEventListener("mousedown", () => setActiveBrowser("b"));
-paneC.addEventListener("mousedown", () => setActiveBrowser("c"));
-paneD.addEventListener("mousedown", () => setActiveBrowser("d"));
 
-// Przycisk "+" w panelu A otwiera kolejną przeglądarkę (B -> C -> D)
-openBrowserBButton.addEventListener("click", () => {
-  // Sprawdź którą przeglądarkę otworzyć
-  if (!isBrowserBOpen) {
-    isBrowserBOpen = true;
-    updateActiveUI();
-    const defaultUrl = urlInputB.value.trim();
-    if (defaultUrl && webviewB.src === "about:blank") {
-      navigate(browsers.b, defaultUrl);
-    }
-    addLog("✓ Otworzono przegladarke B", "success", "b");
-  } else if (!isBrowserCOpen && maxBrowsers >= 3) {
-    isBrowserCOpen = true;
-    updateActiveUI();
-    const defaultUrl = urlInputC.value.trim();
-    if (defaultUrl && webviewC.src === "about:blank") {
-      navigate(browsers.c, defaultUrl);
-    }
-    addLog("✓ Otworzono przegladarke C", "success", "c");
-  } else if (!isBrowserDOpen && maxBrowsers >= 4) {
-    isBrowserDOpen = true;
-    updateActiveUI();
-    const defaultUrl = urlInputD.value.trim();
-    if (defaultUrl && webviewD.src === "about:blank") {
-      navigate(browsers.d, defaultUrl);
-    }
-    addLog("✓ Otworzono przegladarke D", "success", "d");
-  }
+// Kliknięcie kafelka z otwartą kartą otwiera podgląd na cały obszar
+function handlePaneClick(id) {
+  if (!isBrowserOpen(id)) return;
+  enterFocusMode(id);
+}
+paneA.addEventListener("mousedown", () => handlePaneClick("a"));
+paneB.addEventListener("mousedown", () => handlePaneClick("b"));
+paneC.addEventListener("mousedown", () => handlePaneClick("c"));
+paneD.addEventListener("mousedown", () => handlePaneClick("d"));
+
+// Przyciski minimalizacji - powrót do widoku 4 kafelków
+[minimizeBtnA, minimizeBtnB, minimizeBtnC, minimizeBtnD].forEach((btn) => {
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    exitFocusMode();
+  });
 });
 
-closeBrowserBButton.addEventListener("click", () => {
+// Przycisk "+" na pustym kafelku otwiera daną przeglądarkę i pokazuje ją w podglądzie
+function openBrowserSlot(id) {
+  if (id === "b") {
+    if (isBrowserBOpen) return;
+    isBrowserBOpen = true;
+  } else if (id === "c") {
+    if (isBrowserCOpen || maxBrowsers < 3) return;
+    isBrowserCOpen = true;
+  } else if (id === "d") {
+    if (isBrowserDOpen || maxBrowsers < 4) return;
+    isBrowserDOpen = true;
+  } else {
+    return;
+  }
+
+  updateActiveUI();
+
+  const browser = browsers[id];
+  const defaultUrl = browser.urlInput.value.trim();
+  if (defaultUrl && browser.webview.src === "about:blank") {
+    navigate(browser, defaultUrl);
+  }
+
+  addLog(`✓ Otworzono przegladarke ${id.toUpperCase()}`, "success", id);
+  enterFocusMode(id);
+}
+
+addTabBBtn.addEventListener("click", (e) => {
+  e.stopPropagation();
+  openBrowserSlot("b");
+});
+addTabCBtn.addEventListener("click", (e) => {
+  e.stopPropagation();
+  openBrowserSlot("c");
+});
+addTabDBtn.addEventListener("click", (e) => {
+  e.stopPropagation();
+  openBrowserSlot("d");
+});
+
+closeBrowserBButton.addEventListener("click", (e) => {
+  e.stopPropagation();
   if (!isBrowserBOpen) return;
   isBrowserBOpen = false;
   browsers.b.isTrustedEnabled = false;
@@ -436,7 +535,8 @@ closeBrowserBButton.addEventListener("click", () => {
   addLog("✖ Zamknieto przegladarke B", "info", "b");
 });
 
-closeBrowserCButton.addEventListener("click", () => {
+closeBrowserCButton.addEventListener("click", (e) => {
+  e.stopPropagation();
   if (!isBrowserCOpen) return;
   isBrowserCOpen = false;
   browsers.c.isTrustedEnabled = false;
@@ -446,7 +546,8 @@ closeBrowserCButton.addEventListener("click", () => {
   addLog("✖ Zamknieto przegladarke C", "info", "c");
 });
 
-closeBrowserDButton.addEventListener("click", () => {
+closeBrowserDButton.addEventListener("click", (e) => {
+  e.stopPropagation();
   if (!isBrowserDOpen) return;
   isBrowserDOpen = false;
   browsers.d.isTrustedEnabled = false;
@@ -479,7 +580,7 @@ function getIsTrustedScript() {
 
       // Override dla wszystkich typów eventów
       const eventTypes = ['MouseEvent', 'KeyboardEvent', 'PointerEvent', 'TouchEvent', 'Event'];
-      
+
       eventTypes.forEach(eventType => {
         if (window[eventType]) {
           const OriginalEvent = window[eventType];
@@ -492,14 +593,14 @@ function getIsTrustedScript() {
           window[eventType].prototype = OriginalEvent.prototype;
         }
       });
-      
+
       // Override dla dispatchEvent
       const originalDispatch = EventTarget.prototype.dispatchEvent;
       EventTarget.prototype.dispatchEvent = function(event) {
         forceIsTrusted(event);
         return originalDispatch.call(this, event);
       };
-      
+
       console.log('%c✓ isTrusted Override Aktywny', 'color: green; font-weight: bold; font-size: 14px;');
       console.log('%cWszystkie zdarzenia będą zgłaszać isTrusted = true', 'color: orange;');
     })();
@@ -928,9 +1029,19 @@ function waitForPanelReady(browser) {
         "window.AutoClicker ? window.AutoClicker.waitingForPanel : 'undefined'",
       )
       .then((waiting) => {
+        // Użytkownik zatrzymał AutoClicker w międzyczasie - nie zgłaszaj fałszywego sukcesu
+        if (
+          !browser.autoClickerEnabled ||
+          browser.panelCheckInterval !== checkPanel
+        ) {
+          clearInterval(checkPanel);
+          return;
+        }
+
         if (waiting === false) {
           // Panel się pojawił i zainicjalizował!
           clearInterval(checkPanel);
+          browser.panelCheckInterval = null;
           addLog(
             "✅ Panel rezerwacji znaleziony! AutoClicker gotowy do pracy",
             "success",
@@ -942,6 +1053,7 @@ function waitForPanelReady(browser) {
         } else if (checkCount >= maxChecks) {
           // Timeout - panel się nie pojawił
           clearInterval(checkPanel);
+          browser.panelCheckInterval = null;
           browser.autoClickerEnabled = false;
           browser.waitingForPanel = false;
           updateAutoClickerButton();
@@ -957,12 +1069,15 @@ function waitForPanelReady(browser) {
         // Ignoruj błędy executeJavaScript
       });
   }, checkInterval);
+
+  browser.panelCheckInterval = checkPanel;
 }
 
 toggleAutoClickerBtn.addEventListener("click", async () => {
   const browser = getActiveBrowser();
 
   if (browser.autoClickerEnabled) {
+    const wasWaitingForPanel = browser.waitingForPanel;
     try {
       await browser.webview.executeJavaScript(`
         if (window.AutoClicker) {
@@ -970,12 +1085,18 @@ toggleAutoClickerBtn.addEventListener("click", async () => {
           if (window.AutoClicker.clearAllSlots) window.AutoClicker.clearAllSlots();
         }
       `);
+      if (browser.panelCheckInterval) {
+        clearInterval(browser.panelCheckInterval);
+        browser.panelCheckInterval = null;
+      }
       browser.autoClickerEnabled = false;
       browser.waitingForPanel = false;
       updateAutoClickerButton();
       updateStatusLight(browser);
       addLog(
-        "⏹️ Auto Clicker wyłączony i wyczyszczono kolejkę",
+        wasWaitingForPanel
+          ? "⏹️ Przerwane przez użytkownika (oczekiwanie na panel anulowane)"
+          : "⏹️ Auto Clicker wyłączony i wyczyszczono kolejkę",
         "info",
         browser.id,
       );

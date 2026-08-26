@@ -1,7 +1,7 @@
 {
   "name": "web-test-automation-app",
   "version": "1.0.0",
-  "description": "Aplikacja do testowania stron z AutoClicker i kontrolą zdarzeń",
+  "description": "AutoClicker Windows - automatyzacja pracy w wielu kartach przeglądarki",
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
@@ -30,12 +30,12 @@
   },
   "build": {
     "appId": "com.company.web-test-automation",
-    "productName": "WebTestAutomation",
+    "productName": "AutoClicker Windows",
     "win": {
       "target": [
         "nsis"
       ],
-      "icon": "assets/icon.ico"
+      "icon": "assets/icon.png"
     },
     "files": [
       "src/**/*",

@@ -1,0 +1,663 @@
+/* ===== WEBVIEW CONTAINER ===== */
+/* Zawsze 4 kafelki w układzie 2x2 */
+.webview-container {
+  flex: 1;
+  background: #1a1a1a;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 3px;
+}
+
+html[data-theme="light"] .webview-container {
+  background: #dce4e7;
+}
+
+html[data-theme="light"] .url-bar {
+  background: #f7f9fa;
+  border-bottom-color: #cbd6da;
+}
+
+html[data-theme="light"] .url-input {
+  background: #ffffff;
+  border-color: #b8c5ca;
+  color: #263238;
+}
+
+html[data-theme="light"] .url-actions {
+  border-left-color: #cbd6da;
+}
+
+html[data-theme="light"] .url-btn {
+  color: #315763;
+}
+
+html[data-theme="light"] .url-btn:hover {
+  color: #176b87;
+  background: #e3f0f3;
+}
+
+html[data-theme="light"] .focus-nav-btn {
+  background: #e6f0f3 !important;
+  color: #176b87;
+}
+
+html[data-theme="light"] .focus-nav-btn:hover {
+  background: #cfe3e8 !important;
+}
+
+html[data-theme="light"] .pane-maximize-button {
+  border-color: #8faeb7;
+  background: rgba(255, 255, 255, 0.9);
+  color: #245264;
+}
+
+html[data-theme="light"] .pane-maximize-button:hover {
+  background: #dceef2;
+}
+
+html[data-theme="light"] .empty-slot {
+  background: linear-gradient(135deg, #f7fafb 0%, #edf3f5 100%);
+  border-color: #a9c2c9;
+}
+
+html[data-theme="light"] .webview-pane.pane-empty:hover .empty-slot {
+  background: linear-gradient(135deg, #eef7f9 0%, #e1f0f3 100%);
+  border-color: #43a9c0;
+}
+
+html[data-theme="light"] .empty-slot-label {
+  color: #315763;
+}
+
+html[data-theme="light"] .empty-slot-hint {
+  color: #6b7d85;
+}
+
+/* Tryb podglądu: aktywna karta na cały obszar, reszta jako mini kafelki na dole */
+/* 4 stałe sloty (a/b/c/d) - pozycja kafelka nie zmienia się przy zmianie fokusu */
+.webview-container.focus-mode {
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: 1fr 150px;
+  grid-template-areas:
+    "main main main main"
+    "mini-a mini-b mini-c mini-d";
+}
+
+.webview-pane {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #333;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    opacity 0.32s ease;
+  will-change: opacity;
+}
+
+.webview-pane > webview {
+  opacity: 1;
+  transition: opacity 0.2s ease;
+}
+
+.webview-container.focus-mode .webview-pane.is-mini {
+  opacity: 0.82;
+  animation: focus-mini-enter 0.3s ease both;
+}
+
+.webview-container.focus-mode .webview-pane.role-main {
+  animation: focus-pane-enter 0.32s ease both;
+}
+
+.webview-container:not(.focus-mode) .webview-pane:not(.pane-empty) {
+  animation: focus-pane-exit 0.3s ease both;
+}
+
+@keyframes focus-pane-enter {
+  from {
+    opacity: 0.72;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes focus-mini-enter {
+  from {
+    opacity: 0.45;
+  }
+  to {
+    opacity: 0.82;
+  }
+}
+
+@keyframes focus-pane-exit {
+  from {
+    opacity: 0.78;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.webview-pane.active-pane {
+  box-shadow: inset 0 0 0 2px rgba(102, 126, 234, 0.8);
+}
+
+.webview-pane.pane-a {
+  --pane-accent: #43c6d7;
+}
+
+.webview-pane.pane-b {
+  --pane-accent: #79c267;
+}
+
+.webview-pane.pane-c {
+  --pane-accent: #e6a348;
+}
+
+.webview-pane.pane-d {
+  --pane-accent: #c27bd8;
+}
+
+.webview-pane .pane-browser-label {
+  border-color: var(--pane-accent);
+  color: var(--pane-accent);
+}
+
+.webview-pane.active-pane .pane-browser-label {
+  background: color-mix(in srgb, var(--pane-accent) 18%, transparent);
+}
+
+.webview-pane.active-pane {
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--pane-accent) 70%, transparent);
+}
+
+/* Podświetlenie ramki po najechaniu - sygnalizuje, że kafelek jest klikalny */
+.webview-container:not(.focus-mode) .webview-pane:not(.pane-empty):hover,
+.webview-container.focus-mode .webview-pane.is-mini:hover {
+  border-color: #667eea;
+  box-shadow: inset 0 0 0 2px rgba(102, 126, 234, 0.6);
+}
+
+.webview-pane.pane-empty:hover {
+  border-color: #667eea;
+}
+
+.webview-container.focus-mode .webview-pane.role-main {
+  grid-area: main;
+}
+
+.webview-container.focus-mode #pane-a:not(.role-main) {
+  grid-area: mini-a;
+}
+
+.webview-container.focus-mode #pane-b:not(.role-main) {
+  grid-area: mini-b;
+}
+
+.webview-container.focus-mode #pane-c:not(.role-main) {
+  grid-area: mini-c;
+}
+
+.webview-container.focus-mode #pane-d:not(.role-main) {
+  grid-area: mini-d;
+}
+
+.webview-container.focus-mode .webview-pane.is-mini {
+  cursor: pointer;
+}
+
+.webview-container.focus-mode .webview-pane.is-mini .url-bar {
+  padding: 4px 8px;
+  gap: 4px;
+}
+
+.webview-container.focus-mode .webview-pane.is-mini .url-input {
+  font-size: 11px;
+  padding: 4px 8px;
+}
+
+.webview-container.focus-mode .webview-pane.is-mini .pane-browser-label {
+  flex-basis: 22px;
+  height: 22px;
+  font-size: 10px;
+}
+
+.webview-container.focus-mode .webview-pane.is-mini .pane-status span {
+  display: none;
+}
+
+.webview-container.focus-mode .webview-pane.is-mini webview {
+  pointer-events: none;
+}
+
+/* ===== PUSTY SLOT ("+") ===== */
+.empty-slot {
+  display: none;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #202020 0%, #252525 100%);
+  border: 1px dashed #454545;
+  margin: 10px;
+  border-radius: 8px;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.webview-pane.pane-empty .url-bar,
+.webview-pane.pane-empty webview {
+  display: none;
+}
+
+.webview-pane.pane-empty .empty-slot {
+  display: flex;
+}
+
+.webview-pane.pane-empty:hover .empty-slot {
+  border-color: #667eea;
+  background: linear-gradient(135deg, #242424 0%, #2a2a2a 100%);
+}
+
+.empty-slot-btn {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: none;
+  background: #667eea;
+  color: white;
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s;
+}
+
+.empty-slot-btn:hover:not(:disabled) {
+  background: #764ba2;
+  transform: scale(1.08);
+}
+
+.empty-slot-btn:disabled {
+  background: #444;
+  cursor: not-allowed;
+}
+
+.empty-slot-label {
+  color: #d7d7d7;
+  font-size: 13px;
+}
+
+.empty-slot-hint {
+  color: #858585;
+  font-size: 11px;
+}
+
+/* ===== PRZYCISK MINIMALIZACJI (wyjście z trybu podglądu) ===== */
+.minimize-btn {
+  display: none;
+}
+
+.webview-container.focus-mode .webview-pane.role-main .minimize-btn {
+  display: inline-flex;
+}
+
+.url-bar {
+  background: #2d2d2d;
+  padding: 10px 15px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  border-bottom: 1px solid #444;
+}
+
+.pane-browser-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 28px;
+  height: 28px;
+  border: 1px solid #667eea;
+  border-radius: 6px;
+  color: #dfe3ff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.pane-status {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 6px;
+  color: #cfcfcf;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.page-status {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 5px;
+  color: #9a9a9a;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.page-status__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ffc107;
+}
+
+.page-status--online {
+  color: #79c267;
+}
+
+.page-status--online .page-status__dot {
+  background: #79c267;
+}
+
+.page-status--error {
+  color: #ff8a80;
+}
+
+.page-status--error .page-status__dot {
+  background: #f44336;
+}
+
+.url-input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 15px;
+  background: #1a1a1a;
+  border: 1px solid #444;
+  border-radius: 20px;
+  color: #e0e0e0;
+  font-size: 14px;
+}
+
+.url-input:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.url-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  color: white;
+  border: none;
+  border-radius: 20px;
+  cursor: pointer;
+  font-weight: 600;
+  color: #fff;
+}
+
+.url-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: 0 0 auto;
+  padding-left: 6px;
+  border-left: 1px solid #4a4a4a;
+}
+
+.focus-nav-btn {
+  color: #bfc7ff;
+  background: rgba(102, 126, 234, 0.14) !important;
+  border-radius: 7px;
+}
+
+.focus-nav-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.copy-url-btn svg {
+  width: 19px;
+  height: 19px;
+}
+
+.url-btn:hover {
+  color: #5568d3;
+}
+.url-btn.refresh-btn,
+.url-btn.open-www,
+.url-btn.open-cart,
+.url-btn.copy-url-btn {
+  padding: 0px;
+  background: transparent;
+}
+
+.copy-url-btn:hover {
+  background: rgba(102, 126, 234, 0.16);
+}
+
+.url-btn:focus-visible {
+  outline: 2px solid #a9b5ff;
+  outline-offset: 1px;
+}
+
+webview {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  background: white;
+}
+
+.webview-error {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  width: min(360px, calc(100% - 32px));
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 20px;
+  transform: translate(-50%, -50%);
+  border: 1px solid rgba(244, 67, 54, 0.55);
+  border-radius: 8px;
+  background: rgba(28, 28, 28, 0.94);
+  color: #f4f4f4;
+  text-align: center;
+  z-index: 3;
+}
+
+.webview-error strong {
+  color: #ff8a80;
+  font-size: 14px;
+}
+
+.webview-error span {
+  max-width: 100%;
+  overflow: hidden;
+  color: #bdbdbd;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.webview-error button {
+  margin-top: 4px;
+  padding: 7px 12px;
+  border: 1px solid #667eea;
+  border-radius: 5px;
+  background: rgba(102, 126, 234, 0.2);
+  color: #e4e7ff;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.webview-error button:hover {
+  background: #667eea;
+}
+
+.pane-maximize-button {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 50%;
+  background: rgba(24, 24, 24, 0.82);
+  color: #fff;
+  cursor: pointer;
+  z-index: 2;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.pane-maximize-button:hover {
+  background: #667eea;
+  transform: scale(1.08);
+}
+
+.pane-maximize-button:focus-visible {
+  outline: 2px solid #a9b5ff;
+  outline-offset: 2px;
+}
+
+.webview-container.focus-mode .webview-pane.role-main .pane-maximize-button {
+  display: none;
+}
+
+.pane-focus-overlay {
+    transition: opacity 0.2s ease, background 0.2s ease, transform 0.2s ease;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transform: translate(-50%, -50%);
+  padding: 10px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  background: rgba(24, 24, 24, 0.88);
+  color: #fff;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, background 0.2s ease;
+  z-index: 2;
+}
+
+.webview-container:not(.focus-mode) .webview-pane:not(.pane-empty):hover .pane-focus-overlay,
+.webview-container.focus-mode .webview-pane.is-mini:hover .pane-focus-overlay {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.pane-focus-overlay:hover {
+  background: rgba(102, 126, 234, 0.95);
+  transform: translate(-50%, -50%) scale(1.04);
+}
+
+.webview-container.focus-mode .webview-pane.role-main .pane-focus-overlay {
+  display: none;
+}
+
+@media (max-width: 700px) {
+  .webview-container {
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+  }
+
+  .url-bar {
+    padding: 6px 8px;
+    gap: 6px;
+  }
+
+  .url-input {
+    min-width: 0;
+    padding: 7px 10px;
+    font-size: 12px;
+  }
+
+  .pane-browser-label {
+    flex-basis: 24px;
+    height: 24px;
+  }
+
+  .pane-status span {
+    display: none;
+  }
+
+  .page-status > span:not(.page-status__dot) {
+    display: none;
+  }
+
+  .url-actions {
+    padding-left: 3px;
+  }
+
+  .url-btn {
+    flex-basis: 28px;
+    width: 28px;
+    height: 28px;
+  }
+
+  .pane-maximize-button {
+    right: 8px;
+    bottom: 8px;
+    width: 32px;
+    height: 32px;
+  }
+}
+
+@media (max-width: 520px) {
+  .webview-container.focus-mode {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: minmax(0, 1fr) 90px 90px;
+    grid-template-areas:
+      "main main"
+      "mini-a mini-b"
+      "mini-c mini-d";
+  }
+
+  .url-btn svg {
+    width: 22px !important;
+    height: 22px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .webview-container,
+  .webview-pane,
+  .webview-pane webview,
+  .pane-maximize-button,
+  .pane-focus-overlay {
+    transition: none;
+    animation: none;
+  }
+}
+
+html[data-theme="light"] .url-bar {
+  background: #f7f9fa;
+  border-bottom-color: #cbd6da;
+}
+
+html[data-theme="light"] .url-input {
+  background: #ffffff;
+  border-color: #b8c5ca;
+  color: #263238;
+}

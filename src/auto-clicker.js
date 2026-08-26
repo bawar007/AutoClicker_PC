@@ -5,6 +5,17 @@
 (function () {
   "use strict";
 
+  // Sprzątanie poprzedniego wstrzyknięcia - bez tego stare interwały/obserwery/listenery żyją dalej
+  if (typeof window.__AutoClickerTeardown === "function") {
+    try {
+      window.__AutoClickerTeardown();
+    } catch (e) {}
+  }
+
+  let contentObserverRef = null;
+  let modalObserverRef = null;
+  let slotsBootObserverRef = null;
+
   let pluginIsOn = true;
   let targetDay;
   let nextDay;
@@ -28,12 +39,19 @@
   let isClickStop = false;
   let startSlotValue = null;
   let subType;
+  let waitingPollInterval = null; // polling czekający na pojawienie się #av-slots
   let isStartingRefresh = false;
   let lastRefreshClickAt = 0;
   let refreshBackoffMs = 0;
   let isClicked = false;
+  let apiPollingEnabled = false;
+  let apiPollingIntervalMs = 950;
+  let capturedSlotsRequest = null;
+  let networkCaptureInstalled = false;
   let lastSyncSlotsCount = -1; // Śledzenie ostatniej synchronizacji
   let syncTimeout = null; // Debouncing synchronizacji
+  let lastCapturedSlot = null;
+  let captureSeq = 0;
 
   const debugMode = true; // Ustaw na false, aby wyłączyć logi debugowania
 
@@ -42,13 +60,27 @@
     slotsCount: 0,
     slots: [],
     isRunning: false,
+    lastCapturedSlot: null,
+    captureSeq: 0,
     timestamp: 0,
   };
   const REFRESH_MIN_INTERVAL_MS = 850;
-  const REFRESH_RATE_LIMIT_CHECK_MS = 500;
-  const REFRESH_BACKOFF_STEP_MS = 700;
+  const REFRESH_RATE_LIMIT_CHECK_MS = 200;
+  const REFRESH_BACKOFF_STEP_MS = 250;
   const REFRESH_BACKOFF_MAX_MS = 5000;
   const REFRESH_BACKOFF_DECAY_MS = 200;
+  const API_POLL_BASE_INTERVAL_MS = 950;
+  const API_POLL_MIN_INTERVAL_MS = 300;
+  const API_POLL_MAX_INTERVAL_MS = 10000;
+
+  function sanitizePollingInterval(value) {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return API_POLL_BASE_INTERVAL_MS;
+    return Math.max(
+      API_POLL_MIN_INTERVAL_MS,
+      Math.min(API_POLL_MAX_INTERVAL_MS, Math.round(parsed)),
+    );
+  }
 
   const premiumTypes = ["GOLD", "BUSINESS GOLD"];
   const basicType = "BASIC";
@@ -338,6 +370,403 @@
       .trim();
   }
 
+  function normalizeSlotDate(value) {
+    if (!value || typeof value !== "string") return null;
+    const trimmed = value.trim();
+
+    const isoLike = trimmed.match(
+      /^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2})(?::\d{2})?/,
+    );
+    if (isoLike) {
+      return {
+        date: `${isoLike[3]}.${isoLike[2]}.${isoLike[1]}`,
+        time: `${isoLike[4]}:${isoLike[5]}`,
+      };
+    }
+
+    const localLike = trimmed.match(
+      /^(\d{2})[./-](\d{2})[./-](\d{4})[T\s](\d{2}):(\d{2})(?::\d{2})?/,
+    );
+    if (localLike) {
+      return {
+        date: `${localLike[1]}.${localLike[2]}.${localLike[3]}`,
+        time: `${localLike[4]}:${localLike[5]}`,
+      };
+    }
+
+    return null;
+  }
+
+  function extractDateTimeFromRecord(record) {
+    if (!record || typeof record !== "object") return null;
+
+    const directDate = typeof record.date === "string" ? record.date : null;
+    const directTime = typeof record.time === "string" ? record.time : null;
+    if (directDate && directTime) {
+      return { date: directDate, time: directTime.slice(0, 5) };
+    }
+
+    const candidates = [
+      record.dtFrom,
+      record.dt_from,
+      record.from,
+      record.start,
+      record.startAt,
+      record.datetime,
+      record.dateTime,
+      record.slotDateTime,
+      record.availableAt,
+    ];
+
+    for (const candidate of candidates) {
+      const normalized = normalizeSlotDate(candidate);
+      if (normalized) return normalized;
+    }
+
+    return null;
+  }
+
+  function isPossiblyAvailableRecord(record) {
+    if (!record || typeof record !== "object") return false;
+    if (record.available === true) return true;
+    if (record.isAvailable === true) return true;
+    if (record.disabled === false) return true;
+    if (record.blocked === false) return true;
+    if (record.free === true) return true;
+    if (record.status && typeof record.status === "string") {
+      const s = record.status.toLowerCase();
+      if (s.includes("free") || s.includes("available") || s.includes("open")) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function hasPreferredSlotInApiPayload(payload) {
+    if (
+      !payload ||
+      !Array.isArray(preferredHoursTest) ||
+      preferredHoursTest.length === 0
+    ) {
+      return false;
+    }
+
+    const preferredSet = new Set(
+      preferredHoursTest.map((slot) => `${slot.date} ${slot.time}`),
+    );
+
+    const visited = new Set();
+    const stack = [payload];
+
+    while (stack.length > 0) {
+      const node = stack.pop();
+      if (!node || typeof node !== "object") continue;
+      if (visited.has(node)) continue;
+      visited.add(node);
+
+      if (Array.isArray(node)) {
+        for (const item of node) stack.push(item);
+        continue;
+      }
+
+      const dateTime = extractDateTimeFromRecord(node);
+      if (dateTime && isPossiblyAvailableRecord(node)) {
+        const key = `${dateTime.date} ${dateTime.time}`;
+        if (preferredSet.has(key)) return true;
+      }
+
+      for (const value of Object.values(node)) {
+        if (value && typeof value === "object") stack.push(value);
+      }
+    }
+
+    return false;
+  }
+
+  function looksLikeSlotsRequest(url, bodyText = "") {
+    const source = `${url || ""} ${bodyText || ""}`.toLowerCase();
+    return (
+      source.includes("slot") ||
+      source.includes("slots") ||
+      source.includes("reservation") ||
+      source.includes("book") ||
+      source.includes("av-")
+    );
+  }
+
+  function sanitizeRequestHeaders(headersLike) {
+    const cleaned = {};
+    if (!headersLike) return cleaned;
+
+    const blocked = new Set([
+      "content-length",
+      "host",
+      "origin",
+      "referer",
+      "sec-fetch-mode",
+      "sec-fetch-site",
+      "sec-fetch-dest",
+    ]);
+
+    const appendHeader = (key, value) => {
+      if (!key) return;
+      const lower = String(key).toLowerCase();
+      if (blocked.has(lower)) return;
+      cleaned[String(key)] = String(value);
+    };
+
+    if (typeof Headers !== "undefined" && headersLike instanceof Headers) {
+      headersLike.forEach((value, key) => appendHeader(key, value));
+      return cleaned;
+    }
+
+    if (Array.isArray(headersLike)) {
+      headersLike.forEach((pair) => {
+        if (Array.isArray(pair) && pair.length === 2) {
+          appendHeader(pair[0], pair[1]);
+        }
+      });
+      return cleaned;
+    }
+
+    if (typeof headersLike === "object") {
+      Object.entries(headersLike).forEach(([key, value]) =>
+        appendHeader(key, value),
+      );
+    }
+
+    return cleaned;
+  }
+
+  function parseRequestBody(body) {
+    if (!body) return null;
+    if (typeof body === "string") return body;
+    if (
+      typeof URLSearchParams !== "undefined" &&
+      body instanceof URLSearchParams
+    ) {
+      return body.toString();
+    }
+    if (typeof FormData !== "undefined" && body instanceof FormData) {
+      const params = new URLSearchParams();
+      body.forEach((value, key) => {
+        if (typeof value === "string") {
+          params.append(key, value);
+        }
+      });
+      return params.toString();
+    }
+    return null;
+  }
+
+  function rememberSlotsRequest(requestMeta) {
+    if (!requestMeta || !requestMeta.url) return;
+    const bodyText = requestMeta.body || "";
+    if (!looksLikeSlotsRequest(requestMeta.url, bodyText)) return;
+
+    capturedSlotsRequest = {
+      url: requestMeta.url,
+      method: requestMeta.method || "GET",
+      headers: sanitizeRequestHeaders(requestMeta.headers),
+      body: bodyText || null,
+      credentials: "include",
+      capturedAt: Date.now(),
+    };
+
+    if (debugMode) {
+      console.log(
+        "[AutoClicker][API] Captured slots request:",
+        capturedSlotsRequest,
+      );
+    }
+  }
+
+  function installNetworkCapture() {
+    if (networkCaptureInstalled) return;
+    networkCaptureInstalled = true;
+
+    const originalFetch = window.fetch ? window.fetch.bind(window) : null;
+    if (originalFetch) {
+      window.fetch = async (input, init = {}) => {
+        const url = typeof input === "string" ? input : input?.url;
+        const method = (
+          init?.method ||
+          (typeof input !== "string" ? input?.method : "GET") ||
+          "GET"
+        ).toUpperCase();
+        const headers =
+          init?.headers ||
+          (typeof input !== "string" ? input?.headers : undefined);
+        const body = parseRequestBody(init?.body);
+
+        const requestMeta = {
+          url,
+          method,
+          headers,
+          body,
+        };
+
+        let response;
+        try {
+          response = await originalFetch(input, init);
+        } catch (error) {
+          throw error;
+        }
+
+        try {
+          if (url && looksLikeSlotsRequest(url, body)) {
+            const clone = response.clone();
+            const contentType = clone.headers.get("content-type") || "";
+            let payload;
+            if (contentType.includes("application/json")) {
+              payload = await clone.json();
+            } else {
+              const text = await clone.text();
+              if (text && text.length < 500000) {
+                try {
+                  payload = JSON.parse(text);
+                } catch {
+                  payload = text;
+                }
+              }
+            }
+
+            if (payload && hasPreferredSlotInApiPayload(payload)) {
+              rememberSlotsRequest(requestMeta);
+            } else if (payload && typeof payload === "object") {
+              // Zapamiętaj endpoint slotów nawet bez dopasowania, żeby móc go odpytywać.
+              rememberSlotsRequest(requestMeta);
+            }
+          }
+        } catch {
+          // ignore capture parse errors
+        }
+
+        return response;
+      };
+    }
+
+    const originalXHROpen = XMLHttpRequest.prototype.open;
+    const originalXHRSend = XMLHttpRequest.prototype.send;
+    const originalXHRSetHeader = XMLHttpRequest.prototype.setRequestHeader;
+
+    XMLHttpRequest.prototype.open = function (method, url, ...rest) {
+      this.__acMethod = (method || "GET").toUpperCase();
+      this.__acUrl = url;
+      this.__acHeaders = {};
+      return originalXHROpen.call(this, method, url, ...rest);
+    };
+
+    XMLHttpRequest.prototype.setRequestHeader = function (key, value) {
+      if (!this.__acHeaders) this.__acHeaders = {};
+      this.__acHeaders[key] = value;
+      return originalXHRSetHeader.call(this, key, value);
+    };
+
+    XMLHttpRequest.prototype.send = function (body) {
+      this.__acBody = parseRequestBody(body);
+      this.addEventListener("load", () => {
+        try {
+          const url = this.__acUrl;
+          const bodyText = this.__acBody || "";
+          if (!looksLikeSlotsRequest(url, bodyText)) return;
+
+          if (this.status >= 200 && this.status < 300) {
+            let payload;
+            const responseText = this.responseText || "";
+            if (responseText && responseText.length < 500000) {
+              try {
+                payload = JSON.parse(responseText);
+              } catch {
+                payload = responseText;
+              }
+            }
+
+            if (
+              payload &&
+              (typeof payload === "object" || typeof payload === "string")
+            ) {
+              rememberSlotsRequest({
+                url,
+                method: this.__acMethod || "GET",
+                headers: this.__acHeaders || {},
+                body: bodyText,
+              });
+            }
+          }
+        } catch {
+          // ignore capture errors
+        }
+      });
+
+      return originalXHRSend.call(this, body);
+    };
+  }
+
+  async function querySlotsApi() {
+    if (!capturedSlotsRequest?.url) {
+      return {
+        hasSignature: false,
+        hasPreferredSlot: false,
+        rateLimited: false,
+      };
+    }
+
+    const options = {
+      method: capturedSlotsRequest.method || "GET",
+      headers: capturedSlotsRequest.headers || {},
+      credentials: "include",
+    };
+
+    if (capturedSlotsRequest.body && options.method !== "GET") {
+      options.body = capturedSlotsRequest.body;
+    }
+
+    try {
+      const response = await fetch(capturedSlotsRequest.url, options);
+      if (response.status === 429) {
+        return {
+          hasSignature: true,
+          hasPreferredSlot: false,
+          rateLimited: true,
+        };
+      }
+      if (response.status === 401 || response.status === 403) {
+        return { hasSignature: true, hasPreferredSlot: false, authError: true };
+      }
+      if (!response.ok) {
+        return { hasSignature: true, hasPreferredSlot: false, failed: true };
+      }
+
+      const clone = response.clone();
+      const contentType = clone.headers.get("content-type") || "";
+      let payload = null;
+      if (contentType.includes("application/json")) {
+        payload = await clone.json();
+      } else {
+        const text = await clone.text();
+        if (text && text.length < 500000) {
+          try {
+            payload = JSON.parse(text);
+          } catch {
+            payload = text;
+          }
+        }
+      }
+
+      const hasPreferredSlot = hasPreferredSlotInApiPayload(payload);
+      return {
+        hasSignature: true,
+        hasPreferredSlot,
+        rateLimited: false,
+        authError: false,
+        failed: false,
+      };
+    } catch {
+      return { hasSignature: true, hasPreferredSlot: false, failed: true };
+    }
+  }
+
   function isRefreshRateLimitToastVisible() {
     const toastText = normalizeToastText(getToastText());
     if (!toastText) return false;
@@ -412,7 +841,38 @@
       "button.vbs-refresh-slt-btn",
     );
     if (!refreshButtons.length) return null;
+
+    if (activeSlotTypeBtn?.id === "1-slt-btn") {
+      return refreshButtons[0] || null;
+    }
+
+    if (activeSlotTypeBtn?.id === "4-slt-btn") {
+      return refreshButtons[1] || refreshButtons[0] || null;
+    }
+
     return refreshButtons[0] || null;
+  }
+
+  function markCapturedSlot(date, time) {
+    captureSeq++;
+    lastCapturedSlot = {
+      date,
+      time,
+      attempts: clicksNumber,
+      capturedAt: new Date().toISOString(),
+    };
+
+    window.AutoClickerState = {
+      ...(window.AutoClickerState || {}),
+      slotsCount: preferredHoursTest ? preferredHoursTest.length : 0,
+      slots: preferredHoursTest || [],
+      isRunning: intervalRunning !== null,
+      lastCapturedSlot,
+      captureSeq,
+      timestamp: Date.now(),
+    };
+
+    console.log("[AutoClicker] Slot captured:", lastCapturedSlot);
   }
 
   async function checkAndClickSlotButton(currentDate) {
@@ -489,6 +949,7 @@
             infoSpan.style.color = "green";
           }
           if (infoImage) infoImage.innerHTML = myImages.succes;
+          markCapturedSlot(targetDay, hour);
           return true;
         }
       }
@@ -515,20 +976,69 @@
       }
       const refreshButton = getActiveRefreshButton();
       if (!refreshButton) {
-        stopAutoClick();
-        resetPlugin();
-        return;
+        if (infoSpan) {
+          infoSpan.innerText =
+            "Nie znaleziono przycisku odświeżania, czekam...";
+          infoSpan.style.color = "yellow";
+        }
+        if (infoImage) infoImage.innerHTML = myImages.waiting;
+        await sleep(1000);
+        continue;
       }
 
-      const testW = await waitForSlotWaiterHidden();
-      await waitForRefreshWindow();
-      await sleep(400);
-      if (testW) {
-        await clickElementWithUserEvent(refreshButton);
-        lastRefreshClickAt = Date.now();
-      }
+      if (apiPollingEnabled) {
+        const effectiveApiPollMs =
+          sanitizePollingInterval(apiPollingIntervalMs);
+        const apiResult = await querySlotsApi();
+        if (!apiResult.hasSignature) {
+          const testW = await waitForSlotWaiterHidden();
+          await waitForRefreshWindow(effectiveApiPollMs);
+          if (testW) {
+            await clickElementWithUserEvent(refreshButton);
+            lastRefreshClickAt = Date.now();
+          }
+          await waitForSlotsDetails();
+          continue;
+        }
 
-      await waitForSlotsDetails();
+        if (apiResult.rateLimited) {
+          refreshBackoffMs = Math.min(
+            refreshBackoffMs + REFRESH_BACKOFF_STEP_MS,
+            REFRESH_BACKOFF_MAX_MS,
+          );
+          await sleep(effectiveApiPollMs + refreshBackoffMs);
+          continue;
+        }
+
+        if (
+          apiResult.authError ||
+          apiResult.failed ||
+          !apiResult.hasPreferredSlot
+        ) {
+          await sleep(effectiveApiPollMs + refreshBackoffMs);
+          continue;
+        }
+
+        // Slot znaleziony przez API - wykonaj pojedynczy refresh UI i przejdź do kliknięcia.
+        const waiterForSync = await waitForSlotWaiterHidden();
+        await waitForRefreshWindow();
+        await sleep(50);
+        if (waiterForSync) {
+          await clickElementWithUserEvent(refreshButton);
+          lastRefreshClickAt = Date.now();
+        }
+        await waitForSlotsDetails();
+      } else {
+        const testW = await waitForSlotWaiterHidden();
+        await waitForRefreshWindow();
+        await sleep(50);
+        if (testW) {
+          await clickElementWithUserEvent(refreshButton);
+          lastRefreshClickAt = Date.now();
+        }
+
+        await waitForSlotsDetails();
+      }
 
       const isRefreshLimited = await waitForRefreshRateLimitToast();
       if (isRefreshLimited) {
@@ -701,6 +1211,9 @@
 
       // Synchronizuj ze panelem
       syncWithPanel();
+
+      const submitBtn = document.querySelector("#submitBtn");
+      if (submitBtn) submitBtn.removeEventListener("click", resetPlugin);
 
       if (stopBtn) {
         stopBtn.style.display = "block";
@@ -901,7 +1414,9 @@
   }
 
   function observeContent(element) {
+    if (contentObserverRef) contentObserverRef.disconnect();
     const contentObserver = new MutationObserver(processMutations);
+    contentObserverRef = contentObserver;
     contentObserver.observe(element, {
       childList: true,
       subtree: true,
@@ -950,6 +1465,7 @@
       }
     });
 
+    slotsBootObserverRef = observer;
     observer.observe(document.body, { childList: true, subtree: true });
   }
 
@@ -1178,6 +1694,11 @@
         slotsCount: currentCount,
         slots: preferredHoursTest || [],
         isRunning: intervalRunning !== null,
+        apiPollingEnabled,
+        apiPollingIntervalMs: sanitizePollingInterval(apiPollingIntervalMs),
+        hasCapturedApiRequest: Boolean(capturedSlotsRequest?.url),
+        lastCapturedSlot,
+        captureSeq,
         timestamp: Date.now(),
       };
 
@@ -1289,6 +1810,7 @@
       },
     );
 
+    modalObserverRef = observerModal;
     observerModal.observe(document.body, {
       childList: true,
       subtree: true,
@@ -1313,11 +1835,13 @@
     updateMySlots();
   }
 
-  function resetPlugin() {
+  function resetPlugin({ reloadPage = true, clearSlots = true } = {}) {
     targetDay = null;
     nextDay = null;
     preferredHours = null;
-    preferredHoursTest = [];
+    if (clearSlots) {
+      preferredHoursTest = [];
+    }
     selectors = [];
     intervalRunning = null;
     isWraperAnimation = false;
@@ -1341,18 +1865,25 @@
     lastRefreshClickAt = 0;
     refreshBackoffMs = 0;
 
-    clearAllSlots();
+    if (clearSlots) {
+      clearAllSlots();
+    } else {
+      lastSyncSlotsCount = -1;
+      syncWithPanel();
+    }
 
-    const menu = document.querySelector(".my-menu-for-slots");
-    const menuWrapper = document.querySelector(".my-menu-for-slots__wraper");
-    if (menu) menu.remove();
-    if (menuWrapper) menuWrapper.remove();
+    if (clearSlots) {
+      const menu = document.querySelector(".my-menu-for-slots");
+      const menuWrapper = document.querySelector(".my-menu-for-slots__wraper");
+      if (menu) menu.remove();
+      if (menuWrapper) menuWrapper.remove();
 
-    const countdown = document.getElementById("countdown");
-    if (countdown) countdown.innerText = "";
+      const countdown = document.getElementById("countdown");
+      if (countdown) countdown.innerText = "";
 
-    const slotsEl = document.querySelector(".my-slots");
-    if (slotsEl) slotsEl.innerHTML = "";
+      const slotsEl = document.querySelector(".my-slots");
+      if (slotsEl) slotsEl.innerHTML = "";
+    }
 
     const infoSpan = document.querySelector(".my-info-span");
     const infoImage = document.querySelector(".my-info-image");
@@ -1368,7 +1899,9 @@
     }
     if (startBtn) startBtn.style.display = "block";
 
-    setTimeout(() => window.location.reload(), 3000);
+    if (reloadPage) {
+      setTimeout(() => window.location.reload(), 3000);
+    }
   }
 
   // Initialization - detect premium
@@ -1415,11 +1948,12 @@
 
       const avSlots = document.getElementById("av-slots");
       if (avSlots) {
-        console.log("[DEBUG] AutoClicker: MutationObserver wykrył #av-slots!");
         if (window.AutoClicker && window.AutoClicker._pendingInitialize) {
           window.AutoClicker.waitingForPanel = false;
           window.AutoClicker._initializeWithPanel();
+          return;
         }
+        stopGlobalPanelMonitoring();
       }
     });
 
@@ -1435,12 +1969,12 @@
       // Szukaj #av-slots
       const avSlots = document.getElementById("av-slots");
       if (avSlots) {
-        console.log("[DEBUG] Polling: Znaleziony #av-slots! ", avSlots);
         if (window.AutoClicker && window.AutoClicker._pendingInitialize) {
-          console.log("[DEBUG] Inicjalizuję z polowania...");
           window.AutoClicker.waitingForPanel = false;
           window.AutoClicker._initializeWithPanel();
+          return;
         }
+        stopGlobalPanelMonitoring();
         return;
       }
 
@@ -1476,6 +2010,7 @@
 
   // Uruchom monitoring od razu
   startGlobalPanelMonitoring();
+  installNetworkCapture();
 
   // Public API
   window.AutoClicker = {
@@ -1493,8 +2028,9 @@
         window.AutoClicker._pendingInitialize = true;
 
         // Agresywne polling podczas czekania
+        if (waitingPollInterval) clearInterval(waitingPollInterval);
         let waitingPollCount = 0;
-        const waitingPoll = setInterval(() => {
+        waitingPollInterval = setInterval(() => {
           waitingPollCount++;
           const found = document.getElementById("av-slots");
 
@@ -1503,7 +2039,8 @@
           );
 
           if (found) {
-            clearInterval(waitingPoll);
+            clearInterval(waitingPollInterval);
+            waitingPollInterval = null;
             console.log("[WAIT] Panel znaleziony!");
             window.AutoClicker.waitingForPanel = false;
             window.AutoClicker._pendingInitialize = false;
@@ -1512,7 +2049,8 @@
 
           // Timeout 5 minut
           if (waitingPollCount > 300) {
-            clearInterval(waitingPoll);
+            clearInterval(waitingPollInterval);
+            waitingPollInterval = null;
             console.log("[WAIT] Timeout 5 minut");
             window.AutoClicker.waitingForPanel = false;
             window.AutoClicker._pendingInitialize = false;
@@ -1563,7 +2101,17 @@
       return true;
     },
     start: startAutoClick,
-    stop: stopAutoClick,
+    stop: () => {
+      // Zatrzymaj też ewentualny polling czekający na pojawienie się panelu rezerwacji
+      if (waitingPollInterval) {
+        clearInterval(waitingPollInterval);
+        waitingPollInterval = null;
+        console.log("[WAIT] Polling przerwany przez stop()");
+      }
+      window.AutoClicker.waitingForPanel = false;
+      window.AutoClicker._pendingInitialize = false;
+      return stopAutoClick();
+    },
     reset: resetPlugin,
     clearAllSlots: clearAllSlots,
     addSlot: (dateString, timeString) => {
@@ -1581,6 +2129,55 @@
     },
     getSlots: () => preferredHoursTest,
     isRunning: () => intervalRunning,
+    setApiPollingEnabled: (enabled) => {
+      apiPollingEnabled = Boolean(enabled);
+      syncWithPanel();
+      return {
+        enabled: apiPollingEnabled,
+        intervalMs: sanitizePollingInterval(apiPollingIntervalMs),
+        hasCapturedApiRequest: Boolean(capturedSlotsRequest?.url),
+      };
+    },
+    setApiPollingInterval: (intervalMs) => {
+      apiPollingIntervalMs = sanitizePollingInterval(intervalMs);
+      syncWithPanel();
+      return {
+        enabled: apiPollingEnabled,
+        intervalMs: apiPollingIntervalMs,
+        hasCapturedApiRequest: Boolean(capturedSlotsRequest?.url),
+      };
+    },
+    getApiPollingState: () => ({
+      enabled: apiPollingEnabled,
+      intervalMs: sanitizePollingInterval(apiPollingIntervalMs),
+      hasCapturedApiRequest: Boolean(capturedSlotsRequest?.url),
+      capturedAt: capturedSlotsRequest?.capturedAt || null,
+      endpoint: capturedSlotsRequest?.url || null,
+    }),
+  };
+
+  window.__AutoClickerTeardown = () => {
+    pluginIsOn = false;
+    intervalRunning = null;
+    isClickStop = true;
+
+    stopGlobalPanelMonitoring();
+
+    if (waitingPollInterval) clearInterval(waitingPollInterval);
+    if (timerInterval) clearInterval(timerInterval);
+    if (slotsTimer) clearTimeout(slotsTimer);
+    if (acceptTimer) clearTimeout(acceptTimer);
+    if (toastObservertimer) clearTimeout(toastObservertimer);
+
+    if (slotsObserver) slotsObserver.disconnect();
+    if (acceptObserver) acceptObserver.disconnect();
+    if (toastObserver) toastObserver.disconnect();
+    if (contentObserverRef) contentObserverRef.disconnect();
+    if (modalObserverRef) modalObserverRef.disconnect();
+    if (slotsBootObserverRef) slotsBootObserverRef.disconnect();
+
+    const submitBtn = document.querySelector("#submitBtn");
+    if (submitBtn) submitBtn.removeEventListener("click", resetPlugin);
   };
 
   console.log("✓ AutoClicker loaded");
