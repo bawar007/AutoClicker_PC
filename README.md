@@ -1,6 +1,23 @@
-# 🚀 Web Test Automation App
+# AutoClicker Windows
 
-Aplikacja desktop na Windows do testowania stron internetowych z pełną kontrolą nad zdarzeniami DOM, włącznie z manipulacją właściwości `isTrusted`.
+Aplikacja desktopowa na Windows do automatyzacji pracy w wielu kartach przeglądarki. Zawiera Auto Clicker, zarządzanie slotami, profile pracy, system licencji i wbudowane widoki webview.
+
+> Główna, aktualnie rozwijana wersja znajduje się w katalogu `autoclicker_windows_react/`.
+
+## Najważniejsze funkcje
+
+- do czterech niezależnych kart przeglądarki,
+- powiększanie kart i szybkie przełączanie między nimi,
+- przeciąganie kart w celu zmiany kolejności,
+- status połączenia strony oraz status Auto Clickera,
+- uruchamianie i zatrzymywanie Auto Clickera dla wielu kart,
+- licznik slotów i odliczanie do najbliższego terminu,
+- czyszczenie wybranych slotów przy uruchomieniu aplikacji,
+- profile pracy z eksportem i importem do JSON,
+- motyw jasny, ciemny oraz ustawienia systemowe Windows,
+- filtrowanie, wyszukiwanie i eksport logów,
+- obsługa aktualizacji przez GitHub Releases,
+- system licencji BASIC/GOLD powiązany z Machine ID.
 
 ## 📋 Cechy
 
@@ -56,7 +73,7 @@ Aplikacja desktop na Windows do testowania stron internetowych z pełną kontrol
 1. **Instalacja zależności**
 
 ```powershell
-cd f:\Repozytoria\AutoClicker_windows
+Set-Location ".\autoclicker_windows_react"
 npm install
 ```
 
@@ -69,10 +86,19 @@ npm run dev
 3. **Budowanie aplikacji (plik .exe)**
 
 ```powershell
-npm run build:win
+npm run dist
 ```
 
-Plik instalacyjny znajdziesz w `dist/` po zakończeniu budowania.
+Plik instalacyjny znajdziesz w `autoclicker_windows_react/dist/` po zakończeniu budowania.
+
+### Dostępne skrypty
+
+Uruchamiaj je z katalogu `autoclicker_windows_react/`:
+
+- `npm run dev` - Vite i Electron w trybie deweloperskim,
+- `npm run build` - budowanie frontendu React,
+- `npm run dist` - budowanie instalatora Windows,
+- `npm run start` - uruchomienie zbudowanej aplikacji Electron.
 
 ## 🔑 Aktywacja licencji
 
@@ -99,6 +125,26 @@ GTEST-WXYZ-9876-QRST  (GOLD - 4 przeglądarki)
 3. Wprowadź klucz licencyjny
 4. Klucz zostanie zaszyfrowany i zapisany lokalnie
 5. Aplikacja otworzy się automatycznie
+
+## Aktualizacje aplikacji
+
+Aktualizacje są przygotowane do publikowania przez GitHub Releases w repozytorium `bawar007/AutoClicker_PC`.
+
+### Wydanie nowej wersji
+
+1. Zwiększ numer `version` w `autoclicker_windows_react/package.json`, np. z `0.1.2` na `0.1.3`.
+2. Z katalogu `autoclicker_windows_react/` uruchom:
+
+```powershell
+npm run dist
+```
+
+3. Utwórz na GitHubie Release z tagiem `v0.1.3`.
+4. Dodaj do Release artefakty z katalogu `autoclicker_windows_react/dist/`, w tym instalator, plik `latest.yml` i plik `.blockmap`.
+
+Po uruchomieniu zainstalowanej wersji aplikacja sprawdzi dostępność nowej wersji, zapyta o pobranie i zaproponuje ponowne uruchomienie po zakończeniu pobierania.
+
+> `npm run dist` tworzy instalator lokalnie. Publikowanie bezpośrednio na GitHub wymaga skonfigurowanego tokena `GH_TOKEN` albo ręcznego dodania plików do Release.
 
 ### Struktura pliku licencji
 
@@ -257,20 +303,17 @@ Stwórz plik `test.html`:
 
 ```
 AutoClicker_windows/
-├── src/
-│   ├── main.js                 # Główny proces Electron
-│   ├── preload.js              # Preload script (IPC bridge)
-│   ├── license/
-│   │   └── licenseManager.js   # System licencjonowania
-│   └── ui/
-│       ├── index.html          # Główny interfejs
-│       ├── license.html        # Ekran aktywacji
-│       └── renderer.js         # Logika frontendu
-├── chrome-extension/           # Twoja wtyczka AutoClicker
-│   ├── manifest.json
-│   ├── background.js
-│   ├── content.min.js
-│   └── ...
+├── autoclicker_windows_react/
+│   ├── electron/
+│   │   ├── main.js             # Główny proces i aktualizacje
+│   │   └── preload.js          # Bezpieczny most IPC
+│   ├── src/                    # Interfejs React i hooki aplikacji
+│   ├── assets/                 # Ikona aplikacji
+│   ├── package.json
+│   └── dist/                   # Wynik budowania i instalator
+├── src/auto-clicker.js         # Skrypt Auto Clickera
+├── src/license/                # System licencjonowania
+├── chrome-extension/           # Wtyczka AutoClicker
 ├── package.json
 └── README.md
 ```
@@ -349,7 +392,7 @@ ipcMain.handle("system-click", async (event, { x, y }) => {
 # Wyczyść cache i przebuduj
 Remove-Item -Recurse -Force node_modules
 npm install
-npm run build:win
+npm run dist
 ```
 
 ## 📄 Licencja
@@ -366,6 +409,6 @@ W razie pytań lub problemów:
 
 ---
 
-**Wersja:** 1.0.0  
-**Data:** 25 lutego 2026  
+**Wersja:** 0.1.2  
+**Data:** 26 sierpnia 2026  
 **Platforma:** Windows 10/11

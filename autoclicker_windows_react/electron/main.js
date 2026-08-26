@@ -85,7 +85,10 @@ function setupAutoUpdates() {
   });
 
   autoUpdater.checkForUpdates().catch((error) => {
-    console.error("[Updater] Nie udało się sprawdzić aktualizacji:", error.message);
+    console.error(
+      "[Updater] Nie udało się sprawdzić aktualizacji:",
+      error.message,
+    );
   });
 }
 
