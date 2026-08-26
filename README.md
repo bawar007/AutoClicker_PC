@@ -409,6 +409,6 @@ W razie pytań lub problemów:
 
 ---
 
-**Wersja:** 0.1.2  
-**Data:** 26 sierpnia 2026  
+**Wersja:** 0.1.2
+**Data:** 26 sierpnia 2026
 **Platforma:** Windows 10/11
